@@ -1,10 +1,12 @@
 .program spi_loop
+
 set x, 7 ; Read 8 bits to start (will loop once more then count)
 initial_loop:
 wait 1 pin 1; Wait for rising clock edge
 in pins, 1 ; Read data pin
 wait 0 pin 1; Wait for falling clock edge
 jmp x-- initial_loop ; Jump initial loop
+
 IRQ set 0 ; Trigger data set irq
 set x 23 ; Set x to how many bits to stall for (minus 1)
 wait_loop:
@@ -12,6 +14,7 @@ wait 1 pin 1; Wait for rising clock edge
 in pins, 1 ; Read data pin
 wait 0 pin 1; Wait for rising clock edge
 jmp x-- wait_loop ; Jump wait loop
+
 IRQ set 7 ; Trigger write loop
 .wrap_target
 wait 1 pin 1 ; wait for rising clock edge

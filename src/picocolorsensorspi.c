@@ -16,13 +16,7 @@
 #define PIN_MOSI 2
 #define PIN_MISO 4
 
-// static const PIO pio = pio0;
-
-// static uint sm_read = 0;
-// static uint offset_read = 0;
-
-// static uint sm_write = 0;
-// static uint offset_write = 0;
+#define PIN_DBG  15
 
 static void setup_write_sm(PIO pio, uint *sm, uint* offset) {
     *offset = pio_add_program(pio, &spi_write_loop_program);
@@ -131,6 +125,7 @@ static void __time_critical_func(cs_change_irq)(uint gpio, uint32_t events) {
     if (gpio != PIN_CS) return;
 
     if (events & GPIO_IRQ_EDGE_FALL) {
+        gpio_put(PIN_DBG, true);
         gpio_set_dir(PIN_MISO, GPIO_OUT); // Set MISO to output
         gpio_put(PIN_MISO, false);
         pio_sm_exec(stretched_spi.pio, stretched_spi.sm_write, pio_encode_jmp(stretched_spi.offset_write));
@@ -142,6 +137,7 @@ static void __time_critical_func(cs_change_irq)(uint gpio, uint32_t events) {
 
         if (stretched_spi.transaction_started) stretched_spi.transaction_started(stretched_spi.context);
 
+        gpio_put(PIN_DBG, false);
     } else if (events & GPIO_IRQ_EDGE_RISE) {
         gpio_set_dir(PIN_MISO, false);
         pio_sm_set_enabled(stretched_spi.pio, stretched_spi.sm_read, false);
@@ -158,6 +154,7 @@ static void __time_critical_func(cs_change_irq)(uint gpio, uint32_t events) {
 }
 
 void __time_critical_func(data_request_isr)(void) {
+    gpio_put(PIN_DBG, true);
     uint8_t reg = stretched_spi.read_buffer[0];
     pio_interrupt_clear(stretched_spi.pio, 0);
     dma_channel_abort(stretched_spi.channel_write);
@@ -168,6 +165,7 @@ void __time_critical_func(data_request_isr)(void) {
             dma_channel_transfer_from_buffer_now(stretched_spi.channel_write, buf, buf_len);
         }
     }
+    gpio_put(PIN_DBG, false);
 }
 
 static void __time_critical_func(transaction_started)(void* ctx) {
@@ -185,7 +183,8 @@ static volatile uint8_t* __time_critical_func(data_request)(void* ctx, uint reg,
     (void)reg;
     unsigned int* buf = get_current_values();
     *length = 4;
-    return (volatile uint8_t*)buf;
+    (void)buf;
+    return (volatile uint8_t*)ret_data;
 }
 
 static void __time_critical_func(transaction_ended)(void* ctx, const uint8_t* buffer, uint buffer_len) {
@@ -210,6 +209,7 @@ int main()
     gpio_init(PIN_SCK);
     gpio_init(PIN_MOSI);
     gpio_init(PIN_MISO);
+    gpio_init(PIN_DBG);
 
     gpio_set_dir(PIN_CS, GPIO_IN);
     gpio_set_dir(PIN_SCK, GPIO_IN);
@@ -219,6 +219,8 @@ int main()
     gpio_set_pulls(PIN_SCK, false, false);
     gpio_set_pulls(PIN_MOSI, false, false);
     gpio_set_pulls(PIN_MISO, false, false);
+    gpio_set_dir(PIN_DBG, GPIO_OUT);
+    gpio_set_pulls(PIN_DBG, false, false);
 
     stretched_spi.pio = pio0;
     stretched_spi.context = NULL;
