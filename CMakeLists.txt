@@ -19,9 +19,14 @@ pico_sdk_init()
 
 # Add executable. Default name is the project name, version 0.1
 
-add_executable(picocolorsensorspi picocolorsensorspi.c SEGGER_RTT_printf.c SEGGER_RTT.c)
+add_executable(picocolorsensorspi
+        src/picocolorsensorspi.c
+        segger/SEGGER_RTT_printf.c
+        segger/SEGGER_RTT.c)
 
-pico_generate_pio_header(picocolorsensorspi ${CMAKE_CURRENT_LIST_DIR}/spi.pio)
+target_include_directories(picocolorsensorspi PRIVATE segger)
+
+pico_generate_pio_header(picocolorsensorspi ${CMAKE_CURRENT_LIST_DIR}/pio/stretched_spi.pio)
 
 pico_set_program_name(picocolorsensorspi "picocolorsensorspi")
 pico_set_program_version(picocolorsensorspi "0.1")
@@ -40,3 +45,5 @@ target_link_libraries(picocolorsensorspi
         )
 
 pico_add_extra_outputs(picocolorsensorspi)
+
+target_compile_options(picocolorsensorspi PRIVATE -Werror -Wall -Wextra)
