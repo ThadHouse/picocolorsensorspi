@@ -20,6 +20,7 @@ pico_sdk_init()
 # Add executable. Default name is the project name, version 0.1
 
 add_executable(picocolorsensorspi
+        src/core1.cpp
         src/picocolorsensorspi.c
         segger/SEGGER_RTT_printf.c
         segger/SEGGER_RTT.c)
@@ -40,8 +41,10 @@ target_link_libraries(picocolorsensorspi pico_stdlib)
 # Add any user requested libraries
 target_link_libraries(picocolorsensorspi
         hardware_spi
+        hardware_i2c
         hardware_pio
         hardware_dma
+        pico_multicore
         )
 
 pico_add_extra_outputs(picocolorsensorspi)

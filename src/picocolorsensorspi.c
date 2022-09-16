@@ -4,6 +4,8 @@
 #include "hardware/pio.h"
 #include "hardware/gpio.h"
 #include "hardware/dma.h"
+#include "hardware/sync.h"
+#include "pico/multicore.h"
 #include "stretched_spi.pio.h"
 #include "SEGGER_RTT.h"
 
@@ -174,11 +176,16 @@ static void __time_critical_func(transaction_started)(void* ctx) {
 
 uint8_t ret_data[] = {1, 2, 3, 4};
 
+spin_lock_t* spin_lock = NULL;
+
+extern unsigned int* get_current_values();
+
 static volatile uint8_t* __time_critical_func(data_request)(void* ctx, uint reg, uint* length) {
     (void)ctx;
     (void)reg;
+    unsigned int* buf = get_current_values();
     *length = 4;
-    return ret_data;
+    return (volatile uint8_t*)buf;
 }
 
 static void __time_critical_func(transaction_ended)(void* ctx, const uint8_t* buffer, uint buffer_len) {
@@ -187,9 +194,17 @@ static void __time_critical_func(transaction_ended)(void* ctx, const uint8_t* bu
     (void)buffer_len;
 }
 
+extern void core1_main(void);
+
 int main()
 {
     SEGGER_RTT_printf(0, "Program Start!\n");
+
+    int spin_lock_num = spin_lock_claim_unused(true);
+    spin_lock = spin_lock_init(spin_lock_num);
+
+    multicore_reset_core1();
+    multicore_launch_core1(core1_main);
 
     gpio_init(PIN_CS);
     gpio_init(PIN_SCK);
