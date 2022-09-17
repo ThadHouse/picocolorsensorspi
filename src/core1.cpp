@@ -158,9 +158,9 @@ void init_device(i2c_inst_t *i2c, uint8_t *i2cBuffer)
     // i2c_write_timeout_us(i2c, kAddress, i2cBuffer, 2, false, 25000);
 }
 
-unsigned int values0[10];
-unsigned int values1[10];
-unsigned int values2[10];
+unsigned int values0[14];
+unsigned int values1[14];
+unsigned int values2[14];
 
 static unsigned int* valuesCurrentWrite = values0;
 static unsigned int* valuesCurrentCache = values1;
@@ -228,11 +228,11 @@ extern "C" void core1_main()
             }
             else
             {
-                valuesCurrentWrite[4] = ((i2cBuffer[1] & 0xFF) | ((i2cBuffer[2] & 0xFF) << 8)) & 0x7FF;
-                valuesCurrentWrite[3] = ((i2cBuffer[3] & 0xFF) | ((i2cBuffer[4] & 0xFF) << 8) | ((i2cBuffer[5] & 0xFF) << 16)) & 0x03FFFF;
-                valuesCurrentWrite[2] = ((i2cBuffer[6] & 0xFF) | ((i2cBuffer[7] & 0xFF) << 8) | ((i2cBuffer[8] & 0xFF) << 16)) & 0x03FFFF;
-                valuesCurrentWrite[1] = ((i2cBuffer[9] & 0xFF) | ((i2cBuffer[10] & 0xFF) << 8) | ((i2cBuffer[11] & 0xFF) << 16)) & 0x03FFFF;
-                valuesCurrentWrite[0] = ((i2cBuffer[12] & 0xFF) | ((i2cBuffer[13] & 0xFF) << 8) | ((i2cBuffer[14] & 0xFF) << 16)) & 0x03FFFF;
+                valuesCurrentWrite[5] = ((i2cBuffer[1] & 0xFF) | ((i2cBuffer[2] & 0xFF) << 8)) & 0x7FF;
+                valuesCurrentWrite[4] = ((i2cBuffer[3] & 0xFF) | ((i2cBuffer[4] & 0xFF) << 8) | ((i2cBuffer[5] & 0xFF) << 16)) & 0x03FFFF;
+                valuesCurrentWrite[3] = ((i2cBuffer[6] & 0xFF) | ((i2cBuffer[7] & 0xFF) << 8) | ((i2cBuffer[8] & 0xFF) << 16)) & 0x03FFFF;
+                valuesCurrentWrite[2] = ((i2cBuffer[9] & 0xFF) | ((i2cBuffer[10] & 0xFF) << 8) | ((i2cBuffer[11] & 0xFF) << 16)) & 0x03FFFF;
+                valuesCurrentWrite[1] = ((i2cBuffer[12] & 0xFF) | ((i2cBuffer[13] & 0xFF) << 8) | ((i2cBuffer[14] & 0xFF) << 16)) & 0x03FFFF;
             }
         }
 
@@ -245,13 +245,16 @@ extern "C" void core1_main()
             }
             else
             {
-                valuesCurrentWrite[9] = ((i2cBuffer[1] & 0xFF) | ((i2cBuffer[2] & 0xFF) << 8)) & 0x7FF;
-                valuesCurrentWrite[8] = ((i2cBuffer[3] & 0xFF) | ((i2cBuffer[4] & 0xFF) << 8) | ((i2cBuffer[5] & 0xFF) << 16)) & 0x03FFFF;
-                valuesCurrentWrite[7] = ((i2cBuffer[6] & 0xFF) | ((i2cBuffer[7] & 0xFF) << 8) | ((i2cBuffer[8] & 0xFF) << 16)) & 0x03FFFF;
-                valuesCurrentWrite[6] = ((i2cBuffer[9] & 0xFF) | ((i2cBuffer[10] & 0xFF) << 8) | ((i2cBuffer[11] & 0xFF) << 16)) & 0x03FFFF;
-                valuesCurrentWrite[5] = ((i2cBuffer[12] & 0xFF) | ((i2cBuffer[13] & 0xFF) << 8) | ((i2cBuffer[14] & 0xFF) << 16)) & 0x03FFFF;
+                valuesCurrentWrite[12] = ((i2cBuffer[1] & 0xFF) | ((i2cBuffer[2] & 0xFF) << 8)) & 0x7FF;
+                valuesCurrentWrite[11] = ((i2cBuffer[3] & 0xFF) | ((i2cBuffer[4] & 0xFF) << 8) | ((i2cBuffer[5] & 0xFF) << 16)) & 0x03FFFF;
+                valuesCurrentWrite[10] = ((i2cBuffer[6] & 0xFF) | ((i2cBuffer[7] & 0xFF) << 8) | ((i2cBuffer[8] & 0xFF) << 16)) & 0x03FFFF;
+                valuesCurrentWrite[9] = ((i2cBuffer[9] & 0xFF) | ((i2cBuffer[10] & 0xFF) << 8) | ((i2cBuffer[11] & 0xFF) << 16)) & 0x03FFFF;
+                valuesCurrentWrite[8] = ((i2cBuffer[12] & 0xFF) | ((i2cBuffer[13] & 0xFF) << 8) | ((i2cBuffer[14] & 0xFF) << 16)) & 0x03FFFF;
             }
         }
+
+        valuesCurrentWrite[0] = currentValid0;
+        valuesCurrentWrite[7] = currentValid1;
 
         snprintf(outputBuffer, sizeof(outputBuffer), "%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u\n",
                  currentValid0, currentValid1, valuesCurrentWrite[0], valuesCurrentWrite[1], valuesCurrentWrite[2], valuesCurrentWrite[3], valuesCurrentWrite[4], valuesCurrentWrite[5], valuesCurrentWrite[6], valuesCurrentWrite[7], valuesCurrentWrite[8], valuesCurrentWrite[9]);

@@ -160,7 +160,7 @@ static void __time_critical_func(data_request_isr)(stretched_spi_t* spi) {
     dma_channel_abort(spi->channel_write);
     if (spi->config.data_request) {
         uint32_t buf_len = 0;
-        volatile uint8_t* buf = spi->config.data_request(spi->config.callback_ctx, reg, &buf_len);
+        const volatile uint8_t* buf = spi->config.data_request(spi->config.callback_ctx, reg, &buf_len);
         if (buf_len > 0) {
             dma_channel_transfer_from_buffer_now(spi->channel_write, buf, buf_len);
         }

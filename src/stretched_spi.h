@@ -3,7 +3,7 @@
 #include <stdint.h>
 
 typedef void(*stretched_spi_transaction_started_func)(void* ctx);
-typedef volatile uint8_t*(*stretched_spi_data_request_function)(void* ctx, uint32_t reg, uint32_t* length);
+typedef const volatile uint8_t*(*stretched_spi_data_request_function)(void* ctx, uint32_t reg, uint32_t* length);
 typedef void(*stretched_spi_transaction_ended_func)(void* ctx, const uint8_t* buffer, uint32_t buffer_len);
 
 typedef struct stretched_spi_config_t {

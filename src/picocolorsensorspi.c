@@ -1,12 +1,8 @@
 #include <stdio.h>
 #include "pico/stdlib.h"
-#include "hardware/spi.h"
-#include "hardware/pio.h"
 #include "hardware/gpio.h"
-#include "hardware/dma.h"
 #include "hardware/sync.h"
 #include "pico/multicore.h"
-#include "stretched_spi.pio.h"
 #include "stretched_spi.h"
 #include "SEGGER_RTT.h"
 #include <stdint.h>
@@ -20,25 +16,28 @@
 
 #define PIN_DBG  15
 
-static void __time_critical_func(transaction_started)(void* ctx) {
-    (void)ctx;
-}
-
-uint8_t ret_data[] = {1, 2, 3, 4};
-
+unsigned int* current_values = NULL;
 spin_lock_t* spin_lock = NULL;
 
 extern unsigned int* get_current_values();
 
-static volatile uint8_t* __time_critical_func(data_request)(void* ctx, uint32_t reg, uint32_t* length) {
-
-
+static void __time_critical_func(transaction_started)(void* ctx) {
     (void)ctx;
-    (void)reg;
-    unsigned int* buf = get_current_values();
-    *length = 4;
-    (void)buf;
-    return (volatile uint8_t*)ret_data;
+    current_values = get_current_values();
+}
+
+static const volatile uint8_t* __time_critical_func(data_request)(void* ctx, uint32_t reg, uint32_t* length) {
+    (void)ctx;
+    unsigned int* ptr = current_values;
+    if (current_values == NULL) {
+        *length = 0;
+        return NULL;
+    }
+    if (reg == 2) {
+        ptr = current_values + 7;
+    }
+    *length = 4 * 7;
+    return (const volatile uint8_t*)ptr;
 }
 
 static void __time_critical_func(transaction_ended)(void* ctx, const uint8_t* buffer, uint32_t buffer_len) {
