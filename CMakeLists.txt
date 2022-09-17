@@ -20,8 +20,9 @@ pico_sdk_init()
 # Add executable. Default name is the project name, version 0.1
 
 add_executable(picocolorsensorspi
-        src/core1.cpp
         src/picocolorsensorspi.c
+        src/core1.cpp
+        src/stretched_spi.c
         segger/SEGGER_RTT_printf.c
         segger/SEGGER_RTT.c)
 
