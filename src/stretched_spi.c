@@ -10,6 +10,8 @@ typedef struct stretched_spi_t {
     PIO pio;
     uint sm_write;
     uint offset_write;
+    uint sm_dirs;
+    uint offset_dirs;
     uint channel_write;
     uint sm_read;
     uint offset_read;
@@ -21,6 +23,17 @@ typedef struct stretched_spi_t {
 
 stretched_spi_t stretched_spi[2];
 
+static void setup_dirs_sm(PIO pio, int cipo_pin, int cs_pin, uint *sm, uint* offset) {
+    *offset = pio_add_program(pio, &spi_dirs_loop_program);
+    *sm = pio_claim_unused_sm(pio, true);
+    pio_sm_config c = spi_dirs_loop_program_get_default_config(*offset);
+    sm_config_set_out_pins(&c, cipo_pin, 1);
+    sm_config_set_in_pins(&c, cs_pin);
+
+    pio_sm_init(pio, *sm, *offset, &c);
+    pio_sm_set_enabled(pio, *sm, true);
+}
+
 static void setup_write_sm(PIO pio, int cipo_pin, int copi_pin, uint *sm, uint* offset) {
     *offset = pio_add_program(pio, &spi_write_loop_program);
     *sm = pio_claim_unused_sm(pio, true);
@@ -28,7 +41,6 @@ static void setup_write_sm(PIO pio, int cipo_pin, int copi_pin, uint *sm, uint* 
     sm_config_set_in_pins(&c, copi_pin);
     sm_config_set_out_pins(&c, cipo_pin, 1);
     pio_gpio_init(pio, cipo_pin);
-    pio_sm_set_consecutive_pindirs(pio, *sm, cipo_pin, 1, true);
 
     sm_config_set_out_shift(
         &c,
@@ -108,8 +120,6 @@ static void __time_critical_func(cs_change_irq)(uint gpio, uint32_t events, stre
 
     if (events & GPIO_IRQ_EDGE_FALL) {
         gpio_put(spi->config.dbg_pin, true);
-        gpio_set_dir(spi->config.cipo_pin, GPIO_OUT); // Set CIPO to output
-        gpio_put(spi->config.cipo_pin, false);
         pio_sm_exec(spi->pio, spi->sm_write, pio_encode_jmp(spi->offset_write));
         pio_sm_exec(spi->pio, spi->sm_read, pio_encode_jmp(spi->offset_read));
         pio_enable_sm_mask_in_sync(spi->pio, (1u << spi->sm_write) | (1u << spi->sm_read));
@@ -121,8 +131,6 @@ static void __time_critical_func(cs_change_irq)(uint gpio, uint32_t events, stre
 
         gpio_put(spi->config.dbg_pin, false);
     } else if (events & GPIO_IRQ_EDGE_RISE) {
-        gpio_put(spi->config.cipo_pin, false);
-        gpio_set_dir(spi->config.cipo_pin, false);
         pio_sm_set_enabled(spi->pio, spi->sm_read, false);
         pio_sm_set_enabled(spi->pio, spi->sm_write, false);
         pio_sm_restart(spi->pio, spi->sm_read);
@@ -200,6 +208,8 @@ const stretched_spi_t* stretched_spi_init(const stretched_spi_config_t* config) 
 
     setup_read_sm(spi->pio, spi->config.copi_pin, &spi->sm_read, &spi->offset_read, config->pio_idx == 0 ? data_request_isr_0 : data_request_isr_1);
     configure_read_dma(spi->pio, spi->sm_read, &spi->channel_read);
+
+    setup_dirs_sm(spi->pio, spi->config.cipo_pin, spi->config.cs_pin, &spi->sm_dirs, &spi->offset_dirs);
 
     gpio_set_irq_enabled_with_callback(config->cs_pin, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true, config->pio_idx == 0 ? cs_change_irq_0 : cs_change_irq_1);
 

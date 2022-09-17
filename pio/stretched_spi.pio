@@ -29,3 +29,8 @@ out pins, 1 ; write out pin
 wait 1 pin 1 ; wait for rising clock edge
 wait 0 pin 1; Wait for falling clock edge
 .wrap
+
+.program spi_dirs_loop
+mov osr, pins
+mov osr, !osr
+out pindirs, 1

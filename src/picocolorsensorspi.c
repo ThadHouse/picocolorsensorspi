@@ -36,7 +36,7 @@ static volatile uint8_t* __time_critical_func(data_request)(void* ctx, uint32_t 
     (void)ctx;
     (void)reg;
     unsigned int* buf = get_current_values();
-    *length = 8;
+    *length = 4;
     (void)buf;
     return (volatile uint8_t*)ret_data;
 }
