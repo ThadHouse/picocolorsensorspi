@@ -29,6 +29,7 @@ static void setup_dirs_sm(PIO pio, int cipo_pin, int cs_pin, uint *sm, uint* off
     pio_sm_config c = spi_dirs_loop_program_get_default_config(*offset);
     sm_config_set_out_pins(&c, cipo_pin, 1);
     sm_config_set_in_pins(&c, cs_pin);
+    gpio_set_oeover(cipo_pin, GPIO_OVERRIDE_INVERT);
 
     pio_sm_init(pio, *sm, *offset, &c);
     pio_sm_set_enabled(pio, *sm, true);

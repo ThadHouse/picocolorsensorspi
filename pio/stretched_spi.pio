@@ -32,5 +32,4 @@ wait 0 pin 1; Wait for falling clock edge
 
 .program spi_dirs_loop
 mov osr, pins
-mov osr, !osr
 out pindirs, 1
