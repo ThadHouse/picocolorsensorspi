@@ -44,15 +44,15 @@ static void __time_critical_func(transaction_ended)(void* ctx, const uint8_t* bu
     (void)ctx;
     (void)buffer;
     (void)buffer_len;
-    SEGGER_RTT_printf(0, "%x %x %x %x %x %x %x %x\n",
-    buffer[0],
-    buffer[1],
-    buffer[2],
-    buffer[3],
-    buffer[4],
-    buffer[5],
-    buffer[6],
-    buffer[7]);
+    // SEGGER_RTT_printf(0, "%x %x %x %x %x %x %x %x\n",
+    // buffer[0],
+    // buffer[1],
+    // buffer[2],
+    // buffer[3],
+    // buffer[4],
+    // buffer[5],
+    // buffer[6],
+    // buffer[7]);
 }
 
 extern void core1_main(void);

@@ -220,11 +220,13 @@ extern "C" void core1_main()
         loopTime = make_timeout_time_ms(100);
 
         currentValid0 = read_i2c_data(i2c0, Register::kMainStatus, i2cBuffer, 15);
+        memset(&valuesCurrentWrite[1], 0, 5 * 4);
         if (currentValid0)
         {
             if ((i2cBuffer[0] & 0x20) != 0)
             {
                 init_device(i2c0, i2cBuffer);
+
             }
             else
             {
@@ -237,6 +239,7 @@ extern "C" void core1_main()
         }
 
         currentValid1 = read_i2c_data(i2c1, Register::kMainStatus, i2cBuffer, 15);
+        memset(&valuesCurrentWrite[8], 0, 5 * 4);
         if (currentValid1)
         {
             if ((i2cBuffer[0] & 0x20) != 0)
