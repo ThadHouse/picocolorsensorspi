@@ -158,17 +158,19 @@ void init_device(i2c_inst_t *i2c, uint8_t *i2cBuffer)
     // i2c_write_timeout_us(i2c, kAddress, i2cBuffer, 2, false, 25000);
 }
 
-unsigned int values0[14];
-unsigned int values1[14];
-unsigned int values2[14];
+static constexpr const size_t data_buf_size = 18;
 
-static unsigned int* valuesCurrentWrite = values0;
-static unsigned int* valuesCurrentCache = values1;
-static unsigned int* valuesCurrentRead = values2;
+static uint8_t values0[data_buf_size * 2];
+static uint8_t values1[data_buf_size * 2];
+static uint8_t values2[data_buf_size * 2];
+
+static uint8_t* valuesCurrentWrite = values0;
+static uint8_t* valuesCurrentCache = values1;
+static uint8_t* valuesCurrentRead = values2;
 static bool has_new = false;
 
-extern "C" unsigned int* get_current_values() {
-    unsigned int* tmp = valuesCurrentRead;
+extern "C" uint8_t* get_current_values(size_t* data_length) {
+    uint8_t* tmp = valuesCurrentRead;
     uint32_t irq = spin_lock_blocking(spin_lock);
     if (has_new) {
         valuesCurrentRead = valuesCurrentCache;
@@ -177,6 +179,7 @@ extern "C" unsigned int* get_current_values() {
         has_new = false;
     }
     spin_unlock(spin_lock, irq);
+    *data_length = data_buf_size;
     return tmp;
 }
 
@@ -216,20 +219,20 @@ extern "C" void core1_main()
     gpio_pull_up(6);
     gpio_pull_up(7);
 
-    char outputBuffer[512];
+    //char outputBuffer[512];
 
-    uint8_t i2cBuffer[20];
+    uint8_t i2c_write_buffer[32];
     bool currentValid0 = false;
     bool currentValid1 = false;
     absolute_time_t loopTime;
 
     sleep_ms(100);
 
-    init_device(i2c0, i2cBuffer);
-    read_i2c_data(i2c0, Register::kMainStatus, i2cBuffer, 1);
+    init_device(i2c0, i2c_write_buffer);
+    read_i2c_data(i2c0, Register::kMainStatus, i2c_write_buffer, 1);
 
-    init_device(i2c1, i2cBuffer);
-    read_i2c_data(i2c1, Register::kMainStatus, i2cBuffer, 1);
+    init_device(i2c1, valuesCurrentWrite);
+    read_i2c_data(i2c1, Register::kMainStatus, i2c_write_buffer, 1);
 
     memset(values0, 0, sizeof(values0));
     memset(values1, 0, sizeof(values1));
@@ -239,55 +242,44 @@ extern "C" void core1_main()
     {
         loopTime = make_timeout_time_ms(100);
 
-        currentValid0 = read_i2c_data(i2c0, Register::kMainStatus, i2cBuffer, 15);
-        memset(&valuesCurrentWrite[1], 0, 5 * 4);
+        memset(valuesCurrentWrite, 0, sizeof(values0));
+
+        currentValid0 = read_i2c_data(i2c0, Register::kMainStatus, valuesCurrentWrite + 2, 15);
         if (currentValid0)
         {
-            if ((i2cBuffer[0] & 0x20) != 0)
+            if ((valuesCurrentWrite[2] & 0x20) != 0)
             {
-                init_device(i2c0, i2cBuffer);
-
-            }
-            else
-            {
-                valuesCurrentWrite[5] = ((i2cBuffer[1] & 0xFF) | ((i2cBuffer[2] & 0xFF) << 8)) & 0x7FF;
-                valuesCurrentWrite[4] = ((i2cBuffer[3] & 0xFF) | ((i2cBuffer[4] & 0xFF) << 8) | ((i2cBuffer[5] & 0xFF) << 16)) & 0x03FFFF;
-                valuesCurrentWrite[3] = ((i2cBuffer[6] & 0xFF) | ((i2cBuffer[7] & 0xFF) << 8) | ((i2cBuffer[8] & 0xFF) << 16)) & 0x03FFFF;
-                valuesCurrentWrite[2] = ((i2cBuffer[9] & 0xFF) | ((i2cBuffer[10] & 0xFF) << 8) | ((i2cBuffer[11] & 0xFF) << 16)) & 0x03FFFF;
-                valuesCurrentWrite[1] = ((i2cBuffer[12] & 0xFF) | ((i2cBuffer[13] & 0xFF) << 8) | ((i2cBuffer[14] & 0xFF) << 16)) & 0x03FFFF;
+                init_device(i2c0, i2c_write_buffer);
+                currentValid0 = 0;
             }
         }
 
-        currentValid1 = read_i2c_data(i2c1, Register::kMainStatus, i2cBuffer, 15);
-        memset(&valuesCurrentWrite[8], 0, 5 * 4);
+        currentValid1 = read_i2c_data(i2c1, Register::kMainStatus, valuesCurrentWrite + data_buf_size + 2, 15);
+
         if (currentValid1)
         {
-            if ((i2cBuffer[0] & 0x20) != 0)
+            if ((valuesCurrentWrite[data_buf_size + 2] & 0x20) != 0)
             {
-                init_device(i2c1, i2cBuffer);
-            }
-            else
-            {
-                valuesCurrentWrite[12] = ((i2cBuffer[1] & 0xFF) | ((i2cBuffer[2] & 0xFF) << 8)) & 0x7FF;
-                valuesCurrentWrite[11] = ((i2cBuffer[3] & 0xFF) | ((i2cBuffer[4] & 0xFF) << 8) | ((i2cBuffer[5] & 0xFF) << 16)) & 0x03FFFF;
-                valuesCurrentWrite[10] = ((i2cBuffer[6] & 0xFF) | ((i2cBuffer[7] & 0xFF) << 8) | ((i2cBuffer[8] & 0xFF) << 16)) & 0x03FFFF;
-                valuesCurrentWrite[9] = ((i2cBuffer[9] & 0xFF) | ((i2cBuffer[10] & 0xFF) << 8) | ((i2cBuffer[11] & 0xFF) << 16)) & 0x03FFFF;
-                valuesCurrentWrite[8] = ((i2cBuffer[12] & 0xFF) | ((i2cBuffer[13] & 0xFF) << 8) | ((i2cBuffer[14] & 0xFF) << 16)) & 0x03FFFF;
+                init_device(i2c1, i2c_write_buffer);
+                currentValid1 = 0;
             }
         }
 
-        valuesCurrentWrite[0] = currentValid0 ? 0x101 : 1;
-        valuesCurrentWrite[7] = currentValid1 ? 0x202 : 2;
+        valuesCurrentWrite[0] = 1;
+        valuesCurrentWrite[data_buf_size] = 2;
 
-        valuesCurrentWrite[6] = getCRC((const uint8_t*)&valuesCurrentWrite[0], sizeof(valuesCurrentWrite[0]) * 6);
-        valuesCurrentWrite[13] = getCRC((const uint8_t*)&valuesCurrentWrite[7], sizeof(valuesCurrentWrite[7]) * 6);
+        valuesCurrentWrite[1] = currentValid0 ? 1 : 0;
+        valuesCurrentWrite[data_buf_size + 1] = currentValid1 ? 1 : 0;
 
-        snprintf(outputBuffer, sizeof(outputBuffer), "%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u\n",
-                 currentValid0, currentValid1, valuesCurrentWrite[0], valuesCurrentWrite[1], valuesCurrentWrite[2], valuesCurrentWrite[3], valuesCurrentWrite[4], valuesCurrentWrite[5], valuesCurrentWrite[6], valuesCurrentWrite[7], valuesCurrentWrite[8], valuesCurrentWrite[9]);
+        valuesCurrentWrite[data_buf_size - 1] = getCRC(&valuesCurrentWrite[0], data_buf_size - 1);
+        valuesCurrentWrite[(data_buf_size * 2) - 1] = getCRC(&valuesCurrentWrite[data_buf_size], data_buf_size -1);
 
-        SEGGER_RTT_printf(0, "%s", outputBuffer);
+        // snprintf(outputBuffer, sizeof(outputBuffer), "%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u\n",
+        //          currentValid0, currentValid1, valuesCurrentWrite[0], valuesCurrentWrite[1], valuesCurrentWrite[2], valuesCurrentWrite[3], valuesCurrentWrite[4], valuesCurrentWrite[5], valuesCurrentWrite[6], valuesCurrentWrite[7], valuesCurrentWrite[8], valuesCurrentWrite[9]);
 
-        unsigned int* tmp = valuesCurrentWrite;
+        // SEGGER_RTT_printf(0, "%s", outputBuffer);
+
+        uint8_t* tmp = valuesCurrentWrite;
         uint32_t irq = spin_lock_blocking(spin_lock);
         valuesCurrentWrite = valuesCurrentCache;
         valuesCurrentCache = tmp;

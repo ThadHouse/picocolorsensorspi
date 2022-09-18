@@ -16,27 +16,28 @@
 
 #define PIN_DBG  15
 
-unsigned int* current_values = NULL;
+uint8_t* current_values = NULL;
+size_t data_length;
 spin_lock_t* spin_lock = NULL;
 
-extern unsigned int* get_current_values();
+extern uint8_t* get_current_values(size_t* data_length);
 
 static void __time_critical_func(transaction_started)(void* ctx) {
     (void)ctx;
-    current_values = get_current_values();
+    current_values = get_current_values(&data_length);
 }
 
 static const volatile uint8_t* __time_critical_func(data_request)(void* ctx, uint32_t reg, uint32_t* length) {
     (void)ctx;
-    unsigned int* ptr = current_values;
+    uint8_t* ptr = current_values;
     if (current_values == NULL) {
         *length = 0;
         return NULL;
     }
     if (reg == 2) {
-        ptr = current_values + 7;
+        ptr = current_values + data_length;
     }
-    *length = 4 * 7;
+    *length = data_length;
     return (const volatile uint8_t*)ptr;
 }
 
