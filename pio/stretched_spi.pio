@@ -8,13 +8,6 @@ wait 0 pin 1; Wait for falling clock edge
 jmp x-- initial_loop ; Jump initial loop
 
 IRQ set 0 ; Trigger data set irq
-set x 23 ; Set x to how many bits to stall for (minus 1)
-wait_loop:
-wait 1 pin 1; Wait for rising clock edge
-in pins, 1 ; Read data pin
-wait 0 pin 1; Wait for rising clock edge
-jmp x-- wait_loop ; Jump wait loop
-
 IRQ set 7 ; Trigger write loop
 .wrap_target
 wait 1 pin 1 ; wait for rising clock edge
@@ -25,9 +18,13 @@ wait 0 pin 1; Wait for falling clock edge
 .program spi_write_loop
 wait 1 irq 7 ; wait for other loop to start us
 .wrap_target
+pull noblock
+set y 7
+loop:
 out pins, 1 ; write out pin
 wait 1 pin 1 ; wait for rising clock edge
 wait 0 pin 1; Wait for falling clock edge
+jmp y-- loop
 .wrap
 
 .program spi_dirs_loop

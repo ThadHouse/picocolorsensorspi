@@ -180,6 +180,26 @@ extern "C" unsigned int* get_current_values() {
     return tmp;
 }
 
+#define CRC7_POLY 0x91
+
+static uint8_t getCRC(const uint8_t* message, uint8_t length)
+{
+    uint8_t i, j, crc = 0;
+
+    for (i = 0; i < length; i++)
+    {
+        crc ^= message[i];
+        for (j = 0; j < 8; j++)
+        {
+            if (crc & 1) {
+                crc ^= CRC7_POLY;
+            }
+            crc >>= 1;
+        }
+    }
+    return crc;
+}
+
 extern "C" void core1_main()
 {
     // Init I2c 0
@@ -256,8 +276,11 @@ extern "C" void core1_main()
             }
         }
 
-        valuesCurrentWrite[0] = currentValid0;
-        valuesCurrentWrite[7] = currentValid1;
+        valuesCurrentWrite[0] = currentValid0 ? 0x101 : 1;
+        valuesCurrentWrite[7] = currentValid1 ? 0x202 : 2;
+
+        valuesCurrentWrite[6] = getCRC((const uint8_t*)&valuesCurrentWrite[0], sizeof(valuesCurrentWrite[0]) * 6);
+        valuesCurrentWrite[13] = getCRC((const uint8_t*)&valuesCurrentWrite[7], sizeof(valuesCurrentWrite[7]) * 6);
 
         snprintf(outputBuffer, sizeof(outputBuffer), "%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u\n",
                  currentValid0, currentValid1, valuesCurrentWrite[0], valuesCurrentWrite[1], valuesCurrentWrite[2], valuesCurrentWrite[3], valuesCurrentWrite[4], valuesCurrentWrite[5], valuesCurrentWrite[6], valuesCurrentWrite[7], valuesCurrentWrite[8], valuesCurrentWrite[9]);

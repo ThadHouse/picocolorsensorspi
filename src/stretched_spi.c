@@ -46,7 +46,7 @@ static void setup_write_sm(PIO pio, int cipo_pin, int copi_pin, uint *sm, uint* 
     sm_config_set_out_shift(
         &c,
         false, // Shift-to-right = false (i.e. shift to left)
-        true,  // Autopush enabled
+        false,  // Autopush enabled
         8      // Autopush threshold = 8
     );
     pio_sm_init(pio, *sm, *offset, &c);
