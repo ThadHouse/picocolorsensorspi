@@ -10,6 +10,8 @@ typedef struct stretched_spi_t {
     PIO pio;
     uint sm_write;
     uint offset_write;
+    uint sm_cs;
+    uint offset_cs;
     uint sm_dirs;
     uint offset_dirs;
     uint channel_write;
@@ -22,6 +24,15 @@ typedef struct stretched_spi_t {
 
 
 stretched_spi_t stretched_spi[2];
+
+static void setup_io_sm(PIO pio, int cs_pin, uint* sm, uint* offset) {
+    *offset = pio_add_program(pio, &spi_cs_loop_program);
+    *sm = pio_claim_unused_sm(pio, true);
+    pio_sm_config c = spi_cs_loop_program_get_default_config(*offset);
+    sm_config_set_in_pins(&c, cs_pin);
+
+    pio_sm_init(pio, *sm, *offset, &c);
+}
 
 static void setup_dirs_sm(PIO pio, int cipo_pin, int cs_pin, uint *sm, uint* offset) {
     *offset = pio_add_program(pio, &spi_dirs_loop_program);
@@ -52,7 +63,7 @@ static void setup_write_sm(PIO pio, int cipo_pin, int copi_pin, uint *sm, uint* 
     pio_sm_init(pio, *sm, *offset, &c);
 }
 
-static void setup_read_sm(PIO pio, int copi_pin, uint *sm, uint* offset, irq_handler_t prepare_data_handler) {
+static void setup_read_sm(PIO pio, int copi_pin, uint *sm, uint* offset) {
     *offset = pio_add_program(pio, &spi_loop_program);
     *sm = pio_claim_unused_sm(pio, true);
     pio_sm_config c = spi_loop_program_get_default_config(*offset);
@@ -66,10 +77,6 @@ static void setup_read_sm(PIO pio, int copi_pin, uint *sm, uint* offset, irq_han
     );
 
     pio_sm_init(pio, *sm, *offset, &c);
-
-    pio_set_irq0_source_enabled(pio, pis_interrupt0, true);
-	irq_set_exclusive_handler(PIO0_IRQ_0, prepare_data_handler);
-	irq_set_enabled(PIO0_IRQ_0, true);
 }
 
 static void configure_read_dma(PIO pio, uint sm, uint* channel) {
@@ -116,43 +123,6 @@ static void configure_write_dma(PIO pio, uint sm, uint* channel) {
     *channel = dma_channel;
 }
 
-static void __time_critical_func(cs_change_irq)(uint gpio, uint32_t events, stretched_spi_t* spi) {
-    if (gpio != (uint)spi->config.cs_pin) return;
-
-    if (events & GPIO_IRQ_EDGE_FALL) {
-        gpio_put(spi->config.dbg_pin, true);
-        pio_sm_exec(spi->pio, spi->sm_write, pio_encode_jmp(spi->offset_write));
-        pio_sm_exec(spi->pio, spi->sm_read, pio_encode_jmp(spi->offset_read));
-        pio_enable_sm_mask_in_sync(spi->pio, (1u << spi->sm_write) | (1u << spi->sm_read));
-
-        dma_channel_abort(spi->channel_read);
-        dma_channel_transfer_to_buffer_now(spi->channel_read, spi->read_buffer, 256);
-
-        if (spi->config.transaction_started) spi->config.transaction_started(spi->config.callback_ctx);
-
-        gpio_put(spi->config.dbg_pin, false);
-    } else if (events & GPIO_IRQ_EDGE_RISE) {
-        pio_sm_set_enabled(spi->pio, spi->sm_read, false);
-        pio_sm_set_enabled(spi->pio, spi->sm_write, false);
-        pio_sm_restart(spi->pio, spi->sm_read);
-        pio_sm_restart(spi->pio, spi->sm_write);
-        pio_interrupt_clear(spi->pio, 0);
-        pio_interrupt_clear(spi->pio, 7);
-        pio_sm_clear_fifos(spi->pio, spi->sm_read);
-        pio_sm_clear_fifos(spi->pio, spi->sm_write);
-
-        if (spi->config.transaction_ended) spi->config.transaction_ended(spi->config.callback_ctx, (const uint8_t*)spi->read_buffer, 256);
-    }
-}
-
-static void __time_critical_func(cs_change_irq_0)(uint gpio, uint32_t events) {
-    cs_change_irq(gpio, events, &stretched_spi[0]);
-}
-
-static void __time_critical_func(cs_change_irq_1)(uint gpio, uint32_t events) {
-    cs_change_irq(gpio, events, &stretched_spi[1]);
-}
-
 static void __time_critical_func(data_request_isr)(stretched_spi_t* spi) {
     gpio_put(spi->config.dbg_pin, true);
     uint8_t reg = spi->read_buffer[0];
@@ -168,12 +138,50 @@ static void __time_critical_func(data_request_isr)(stretched_spi_t* spi) {
     gpio_put(spi->config.dbg_pin, false);
 }
 
-static void __time_critical_func(data_request_isr_0)(void) {
-    data_request_isr(&stretched_spi[0]);
+static void __time_critical_func(pio_irq)(stretched_spi_t* spi) {
+    io_rw_32 irqs = spi->pio->irq;
+    //SEGGER_RTT_printf(0, "PIO IRQ %x\n", irqs);
+    if (irqs & (1u << 0)) {
+        //SEGGER_RTT_printf(0, "PIO IRQ  DSR\n");
+        data_request_isr(spi);
+    }
+    if (irqs & (1u << 1)) {
+        //SEGGER_RTT_printf(0, "PIO IRQ CS Falling\n");
+        pio_interrupt_clear(spi->pio, 1);
+        gpio_put(spi->config.dbg_pin, true);
+        pio_sm_exec(spi->pio, spi->sm_write, pio_encode_jmp(spi->offset_write));
+        pio_sm_exec(spi->pio, spi->sm_read, pio_encode_jmp(spi->offset_read));
+        pio_enable_sm_mask_in_sync(spi->pio, (1u << spi->sm_write) | (1u << spi->sm_read));
+
+        dma_channel_abort(spi->channel_read);
+        dma_channel_transfer_to_buffer_now(spi->channel_read, spi->read_buffer, 256);
+
+        if (spi->config.transaction_started) spi->config.transaction_started(spi->config.callback_ctx);
+
+        gpio_put(spi->config.dbg_pin, false);
+    }
+    if (irqs & (1u << 2)) {
+        //SEGGER_RTT_printf(0, "PIO IRQ CS Rising\n");
+        pio_interrupt_clear(spi->pio, 2);
+        pio_sm_set_enabled(spi->pio, spi->sm_read, false);
+        pio_sm_set_enabled(spi->pio, spi->sm_write, false);
+        pio_sm_restart(spi->pio, spi->sm_read);
+        pio_sm_restart(spi->pio, spi->sm_write);
+        pio_interrupt_clear(spi->pio, 0);
+        pio_interrupt_clear(spi->pio, 7);
+        pio_sm_clear_fifos(spi->pio, spi->sm_read);
+        pio_sm_clear_fifos(spi->pio, spi->sm_write);
+
+        if (spi->config.transaction_ended) spi->config.transaction_ended(spi->config.callback_ctx, (const uint8_t*)spi->read_buffer, 256);
+    }
 }
 
-static void __time_critical_func(data_request_isr_1)(void) {
-    data_request_isr(&stretched_spi[1]);
+static void __time_critical_func(pio_irq_0)(void) {
+    pio_irq(&stretched_spi[0]);
+}
+
+static void __time_critical_func(pio_irq_1)(void) {
+    pio_irq(&stretched_spi[1]);
 }
 
 const stretched_spi_t* stretched_spi_init(const stretched_spi_config_t* config) {
@@ -207,12 +215,28 @@ const stretched_spi_t* stretched_spi_init(const stretched_spi_config_t* config) 
     setup_write_sm(spi->pio, spi->config.cipo_pin, spi->config.copi_pin, &spi->sm_write, &spi->offset_write);
     configure_write_dma(spi->pio, spi->sm_write, &spi->channel_write);
 
-    setup_read_sm(spi->pio, spi->config.copi_pin, &spi->sm_read, &spi->offset_read, config->pio_idx == 0 ? data_request_isr_0 : data_request_isr_1);
+    setup_read_sm(spi->pio, spi->config.copi_pin, &spi->sm_read, &spi->offset_read);
     configure_read_dma(spi->pio, spi->sm_read, &spi->channel_read);
 
     setup_dirs_sm(spi->pio, spi->config.cipo_pin, spi->config.cs_pin, &spi->sm_dirs, &spi->offset_dirs);
 
-    gpio_set_irq_enabled_with_callback(config->cs_pin, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true, config->pio_idx == 0 ? cs_change_irq_0 : cs_change_irq_1);
+    setup_io_sm(spi->pio, spi->config.cs_pin, &spi->sm_cs, &spi->offset_cs);
+
+    pio_set_irq0_source_enabled(spi->pio, pis_interrupt0, true);
+    pio_set_irq0_source_enabled(spi->pio, pis_interrupt1, true);
+    pio_set_irq0_source_enabled(spi->pio, pis_interrupt2, true);
+
+    if (config->pio_idx == 0) {
+        irq_set_exclusive_handler(PIO0_IRQ_0, pio_irq_0);
+        irq_set_enabled(PIO0_IRQ_0, true);
+    } else {
+        irq_set_exclusive_handler(PIO1_IRQ_0, pio_irq_1);
+        irq_set_enabled(PIO1_IRQ_0, true);
+    }
+
+    pio_sm_set_enabled(spi->pio, spi->sm_cs, true);
+
+    //gpio_set_irq_enabled_with_callback(config->cs_pin, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true, config->pio_idx == 0 ? cs_change_irq_0 : cs_change_irq_1);
 
     // gpio_set_dir(spi->config.cipo_pin, false);
     // pio_sm_set_enabled(spi->pio, spi->sm_read, false);

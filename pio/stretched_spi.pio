@@ -27,6 +27,14 @@ wait 0 pin 1; Wait for falling clock edge
 jmp y-- loop
 .wrap
 
+; For this program to work oeover must be inverted for the CS pin
+; gpio_set_oeover(cipo_pin, GPIO_OVERRIDE_INVERT);
 .program spi_dirs_loop
-mov osr, pins
-out pindirs, 1
+mov osr, pins ; read cs pin
+out pindirs, 1 ; write cs pin to oe of cipo
+
+.program spi_cs_loop
+wait 0 pin 0 ; wait for falling edge of cs pin
+irq set 1 ; trigger falling edge irq
+wait 1 pin 0 ; wait for rising edge of cs pin
+irq set 2 ; trigger rising edge irq

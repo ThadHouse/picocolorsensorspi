@@ -9,7 +9,7 @@
 
 // SPI Defines
 // Any pins can be used, but SCK must be 1 after COPI
-#define PIN_CS   1
+#define PIN_CS   5
 #define PIN_SCK  3
 #define PIN_COPI 2
 #define PIN_CIPO 4
