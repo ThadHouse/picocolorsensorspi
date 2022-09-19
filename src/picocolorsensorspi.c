@@ -27,10 +27,15 @@ static const volatile uint8_t* __time_critical_func(transaction_started)(void* c
     (void)length;
     current_values = get_current_values(&data_length);
     return NULL;
+    // *length = data_length;
+    // return current_values;
 }
 
 static const volatile uint8_t* __time_critical_func(data_request)(void* ctx, uint32_t reg, uint32_t* length) {
     (void)ctx;
+    (void)reg;
+    (void)length;
+    //return NULL;
     uint8_t* ptr = current_values;
     if (current_values == NULL) {
         *length = 0;

@@ -136,7 +136,7 @@ inline static int safe_fifo_rx_wait_for_finish(pio_hw_t *pio, uint sm, uint chan
         wooble++;
         if (wooble > 1000) {
             //check_pio_debug("stuck dma");
-            SEGGER_RTT_printf(0, "stuck dma channel %d rem %08x %d @ %d\n", chan, (uint)dma_hw->ch[chan].transfer_count, sm, (int)pio->sm[sm].addr);
+            SEGGER_RTT_printf(0, "stuck dma channel %d rem %08x %d @ %d\n", chan, (int)pio_sm_get_rx_fifo_level(pio, sm), sm, (int)pio->sm[sm].addr);
             //__breakpoint();
             return 1;
         }
@@ -271,6 +271,7 @@ const stretched_spi_t* stretched_spi_init(const stretched_spi_config_t* config) 
     spi->startstop_mask = (1u << spi->sm_write) | (1u << spi->sm_read) | (1u << spi->sm_initial);
 
     prepare_for_next(spi);
+    dma_channel_transfer_to_buffer_now(spi->channel_read, spi->read_buffer, 256);
 
     pio_sm_set_enabled(spi->pio, spi->sm_cs, true);
 
