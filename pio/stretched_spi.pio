@@ -1,5 +1,29 @@
 .program spi_loop
+set x, 7 ; Read 8 bits to start (will loop once more then count)
+initial_loop:
+wait 1 pin 1; Wait for rising clock edge
+in pins, 1 ; Read data pin
+wait 0 pin 1; Wait for falling clock edge
+jmp x-- initial_loop ; Jump initial loop
 
+.program spi_write_loop
+pull noblock
+set y 7
+loop:
+out pins, 1 ; write out pin
+wait 1 pin 1 ; wait for rising clock edge
+wait 0 pin 1; Wait for falling clock edge
+jmp y-- loop
+
+.program spi_cs_loop
+wait 0 pin 0 ; wait for falling edge of cs pin
+set pindirs 1
+irq set 1 ; trigger falling edge irq
+wait 1 pin 0 ; wait for rising edge of cs pin
+set pindirs 0
+irq set 2 ; trigger rising edge irq
+
+.program spi_initial_loop
 set x, 7 ; Read 8 bits to start (will loop once more then count)
 jmp initial_loop_rising
 initial_loop:
@@ -8,36 +32,6 @@ initial_loop_rising:
 wait 1 pin 1; Wait for rising clock edge
 in pins, 1 ; Read data pin
 jmp x-- initial_loop ; Jump initial loop
-
 IRQ set 0 ; Trigger data set irq
-wait 0 pin 1; Wait for falling clock edge
-IRQ set 7 ; Trigger write loop
-.wrap_target
-wait 1 pin 1 ; wait for rising clock edge
-in pins, 1 ; Read data pin
-wait 0 pin 1; Wait for falling clock edge
-.wrap
-
-.program spi_write_loop
-wait 1 irq 7 ; wait for other loop to start us
-.wrap_target
-pull noblock
-set y 7
-loop:
-out pins, 1 ; write out pin
-wait 1 pin 1 ; wait for rising clock edge
-wait 0 pin 1; Wait for falling clock edge
-jmp y-- loop
-.wrap
-
-; For this program to work oeover must be inverted for the CS pin
-; gpio_set_oeover(cipo_pin, GPIO_OVERRIDE_INVERT);
-.program spi_dirs_loop
-mov osr, pins ; read cs pin
-out pindirs, 1 ; write cs pin to oe of cipo
-
-.program spi_cs_loop
-wait 0 pin 0 ; wait for falling edge of cs pin
-irq set 1 ; trigger falling edge irq
-wait 1 pin 0 ; wait for rising edge of cs pin
-irq set 2 ; trigger rising edge irq
+spin_loop:
+jmp spin_loop
