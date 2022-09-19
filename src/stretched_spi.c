@@ -168,7 +168,7 @@ static void __time_critical_func(data_request_isr)(stretched_spi_t* spi) {
     if (spi->config.data_request) {
         uint32_t buf_len = 0;
         const volatile uint8_t* buf = spi->config.data_request(spi->config.callback_ctx, reg, &buf_len);
-        if (buf_len > 0) {
+        if (buf) {
             dma_channel_transfer_from_buffer_now(spi->channel_write, buf, buf_len);
         }
     }
@@ -188,7 +188,13 @@ static void __time_critical_func(pio_irq)(stretched_spi_t* spi) {
         pio_interrupt_clear(spi->pio, 1);
         gpio_put(spi->config.dbg_pin, true);
 
-        if (spi->config.transaction_started) spi->config.transaction_started(spi->config.callback_ctx);
+        if (spi->config.transaction_started) {
+            uint32_t buf_len;
+            const volatile uint8_t* buf = spi->config.transaction_started(spi->config.callback_ctx, &buf_len);
+            if (buf) {
+                dma_channel_transfer_from_buffer_now(spi->channel_write, buf, buf_len);
+            }
+        }
 
         pio_enable_sm_mask_in_sync(spi->pio, (1u << spi->sm_write) | (1u << spi->sm_read) | (1u << spi->sm_initial));
 

@@ -22,9 +22,11 @@ spin_lock_t* spin_lock = NULL;
 
 extern uint8_t* get_current_values(size_t* data_length);
 
-static void __time_critical_func(transaction_started)(void* ctx) {
+static const volatile uint8_t* __time_critical_func(transaction_started)(void* ctx, uint32_t* length) {
     (void)ctx;
+    (void)length;
     current_values = get_current_values(&data_length);
+    return NULL;
 }
 
 static const volatile uint8_t* __time_critical_func(data_request)(void* ctx, uint32_t reg, uint32_t* length) {
