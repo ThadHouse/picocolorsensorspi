@@ -22,13 +22,13 @@ pico_sdk_init()
 add_executable(picocolorsensorspi
         src/picocolorsensorspi.c
         src/core1.cpp
-        src/stretched_spi.c
+        src/pio_spi.c
         segger/SEGGER_RTT_printf.c
         segger/SEGGER_RTT.c)
 
 target_include_directories(picocolorsensorspi PRIVATE segger)
 
-pico_generate_pio_header(picocolorsensorspi ${CMAKE_CURRENT_LIST_DIR}/pio/stretched_spi.pio)
+pico_generate_pio_header(picocolorsensorspi ${CMAKE_CURRENT_LIST_DIR}/pio/pio_spi.pio)
 
 pico_set_program_name(picocolorsensorspi "picocolorsensorspi")
 pico_set_program_version(picocolorsensorspi "0.1")

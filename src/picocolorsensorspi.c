@@ -3,7 +3,7 @@
 #include "hardware/gpio.h"
 #include "hardware/sync.h"
 #include "pico/multicore.h"
-#include "stretched_spi.h"
+#include "pio_spi.h"
 #include "SEGGER_RTT.h"
 #include <stdint.h>
 
@@ -22,37 +22,34 @@ spin_lock_t* spin_lock = NULL;
 
 extern uint8_t* get_current_values(size_t* data_length);
 
-static const volatile uint8_t* __time_critical_func(transaction_started)(void* ctx, uint32_t* length) {
+static pio_spi_t* spi;
+static volatile uint8_t dma_buf[256];
+
+static void __time_critical_func(transaction_started)(void* ctx) {
     (void)ctx;
-    (void)length;
+    pio_spi_provide_read_buffer(spi, dma_buf, 255);
     current_values = get_current_values(&data_length);
-    return NULL;
-    // *length = data_length;
-    // return current_values;
 }
 
-static const volatile uint8_t* __time_critical_func(data_request)(void* ctx, uint32_t reg, uint32_t* length) {
+static void __time_critical_func(data_request)(void* ctx, uint8_t reg) {
     (void)ctx;
     (void)reg;
-    (void)length;
     //return NULL;
     uint8_t* ptr = current_values;
     if (current_values == NULL) {
-        *length = 0;
-        return NULL;
+        return;
     }
     if (reg == 2) {
         ptr = current_values + data_length;
     }
-    *length = data_length;
-    return (const volatile uint8_t*)ptr;
+    pio_spi_provide_write_buffer(spi, (volatile uint8_t*)ptr, data_length);
 }
 
-static void __time_critical_func(transaction_ended)(void* ctx, const uint8_t* buffer, uint32_t buffer_len) {
+static void __time_critical_func(transaction_ended)(void* ctx, uint8_t num_bytes_read, uint8_t num_bytes_written) {
     (void)ctx;
-    (void)buffer;
-    (void)buffer_len;
-    // SEGGER_RTT_printf(0, "%x %x %x %x %x %x %x %x\n",
+    (void)num_bytes_read;
+    (void)num_bytes_written;
+    SEGGER_RTT_printf(0, "%d %d\n", num_bytes_read, num_bytes_written);
     // buffer[0],
     // buffer[1],
     // buffer[2],
@@ -75,7 +72,9 @@ int main()
     multicore_reset_core1();
     multicore_launch_core1(core1_main);
 
-    stretched_spi_config_t config = {
+    sleep_ms(500);
+
+    pio_spi_config_t config = {
         .callback_ctx = NULL,
         .transaction_ended = transaction_ended,
         .transaction_started = transaction_started,
@@ -88,9 +87,8 @@ int main()
         .pio_idx = 0,
     };
 
-    const stretched_spi_t* spi = stretched_spi_init(&config);
-    (void)spi;
-    //stretched_spi_start(spi);
+    spi = pio_spi_init(&config);
+    pio_spi_start(spi);
 
     // Run a heartbeat
     const uint LED_PIN = PICO_DEFAULT_LED_PIN;
