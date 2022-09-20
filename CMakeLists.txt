@@ -7,7 +7,8 @@ set(CMAKE_CXX_STANDARD 17)
 
 # Initialise pico_sdk from installed location
 # (note this can come from environment, CMake cache etc)
-#set(PICO_SDK_PATH "/home/thad/pico/pico-sdk")
+set(PICO_SDK_FETCH_FROM_GIT ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Pull in Raspberry Pi Pico SDK (must be before project)
 include(pico_sdk_import.cmake)

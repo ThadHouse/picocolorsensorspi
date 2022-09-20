@@ -1,4 +1,6 @@
 .program spi_loop
+wait 1 irq 7 ; Use CS loop to fire these 3 loops
+.wrap_target
 set x, 7 ; Read 8 bits to start (will loop once more then count)
 initial_loop:
 wait 1 pin 1; Wait for rising clock edge
@@ -7,6 +9,8 @@ wait 0 pin 1; Wait for falling clock edge
 jmp x-- initial_loop ; Jump initial loop
 
 .program spi_write_loop
+wait 1 irq 7 ; Use CS loop to fire these 3 loops
+.wrap_target
 pull noblock
 set y 7
 loop:
@@ -18,12 +22,15 @@ jmp y-- loop
 .program spi_cs_loop
 wait 0 pin 0 ; wait for falling edge of cs pin
 set pindirs 1
+irq set 7
 irq set 1 ; trigger falling edge irq
 wait 1 pin 0 ; wait for rising edge of cs pin
 set pindirs 0
 irq set 2 ; trigger rising edge irq
 
 .program spi_initial_loop
+wait 1 irq 7 ; Use CS loop to fire these 3 loops
+.wrap_target
 set x, 7 ; Read 8 bits to start (will loop once more then count)
 jmp initial_loop_rising
 initial_loop:

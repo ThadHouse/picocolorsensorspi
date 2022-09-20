@@ -112,15 +112,13 @@ static void configure_write_dma(PIO pio, uint sm, uint* channel) {
     *channel = dma_channel;
 }
 
-inline static int safe_fifo_rx_wait_for_finish(pio_hw_t *pio, uint sm, uint chan) {
-    (void)chan;
+inline static int safe_fifo_rx_wait_for_finish(pio_hw_t *pio, uint sm, uint channel) {
     int wooble = 0;
-    while (!pio_sm_is_rx_fifo_empty(pio, sm)) {
+    while (!pio_sm_is_rx_fifo_empty(pio, sm) && (dma_channel_hw_addr(channel)->transfer_count != 0)) {
         wooble++;
         if (wooble > 1000) {
-            //check_pio_debug("stuck dma");
-            //SEGGER_RTT_printf(0, "stuck dma channel %d rem %08x %d @ %d\n", chan, (int)pio_sm_get_rx_fifo_level(pio, sm), sm, (int)pio->sm[sm].addr);
-            //__breakpoint();
+            // This happens if too many bytes are written to buffer
+            SEGGER_RTT_printf(0, "DMA Overrun\n");
             return 1;
         }
     }
@@ -153,6 +151,8 @@ static pio_spi_read_info_t __time_critical_func(prepare_for_next)(pio_spi_t* spi
     dma_channel_abort(spi->channel_read);
     dma_channel_abort(spi->channel_write);
 
+    pio_enable_sm_mask_in_sync(spi->pio, spi->startstop_mask);
+
     pio_spi_read_info_t ret = {
         .num_bytes_written = spi->write_buf_len ? spi->write_buf_len - writes_remaining - left_in_write_queue : 0,
         .num_bytes_read = spi->read_buf_len ? spi->read_buf_len - reads_remaining : 0,
@@ -160,36 +160,24 @@ static pio_spi_read_info_t __time_critical_func(prepare_for_next)(pio_spi_t* spi
     return ret;
 }
 
-static void __time_critical_func(data_request_isr)(pio_spi_t* spi) {
-    gpio_put(spi->config.dbg_pin, true);
-    uint8_t reg = pio_sm_get(spi->pio, spi->sm_initial);
-    pio_interrupt_clear(spi->pio, 0);
-    if (spi->config.data_request) {
-        spi->config.data_request(spi->config.callback_ctx, reg);
-    }
-    gpio_put(spi->config.dbg_pin, false);
-}
-
 static void __time_critical_func(pio_irq)(pio_spi_t* spi) {
     io_rw_32 irqs = spi->pio->irq;
+    hw_set_bits(&spi->pio->irq, 0x0F); // Clear IRQs
+    gpio_put(spi->config.dbg_pin, true);
     //SEGGER_RTT_printf(0, "PIO IRQ %x\n", irqs);
     if (irqs & (1u << 0)) {
         //SEGGER_RTT_printf(0, "PIO IRQ  DSR\n");
-        while (pio_sm_is_rx_fifo_empty(spi->pio, spi->sm_initial)) tight_loop_contents();
-        data_request_isr(spi);
+        uint8_t reg = pio_sm_get_blocking(spi->pio, spi->sm_initial);
+        if (spi->config.data_request) {
+            spi->config.data_request(spi->config.callback_ctx, reg);
+        }
     }
     if (irqs & (1u << 1)) {
         //SEGGER_RTT_printf(0, "PIO IRQ CS Falling\n");
-        pio_interrupt_clear(spi->pio, 1);
-        gpio_put(spi->config.dbg_pin, true);
-
-        pio_enable_sm_mask_in_sync(spi->pio, (1u << spi->sm_write) | (1u << spi->sm_read) | (1u << spi->sm_initial));
-
         if (spi->config.transaction_started) {
             spi->config.transaction_started(spi->config.callback_ctx);
         }
 
-        gpio_put(spi->config.dbg_pin, false);
     }
     if (irqs & (1u << 2)) {
         //SEGGER_RTT_printf(0, "PIO IRQ CS Rising\n");
@@ -202,6 +190,7 @@ static void __time_critical_func(pio_irq)(pio_spi_t* spi) {
             spi->config.transaction_ended(spi->config.callback_ctx, read_info.num_bytes_read, read_info.num_bytes_written);
         }
     }
+    gpio_put(spi->config.dbg_pin, false);
 }
 
 static void __time_critical_func(pio_irq_0)(void) {
@@ -287,5 +276,5 @@ void pio_spi_start(const pio_spi_t* spi) {
     assert(spi->config.pio_idx == 0 || spi->config.pio_idx == 1);
     assert(spi == &pio_spi[spi->config.pio_idx]);
 
-    pio_sm_set_enabled(spi->pio, spi->sm_cs, true);
+    pio_enable_sm_mask_in_sync(spi->pio, (1u << spi->sm_cs) | spi->startstop_mask);
 }

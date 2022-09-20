@@ -169,7 +169,7 @@ static uint8_t* valuesCurrentCache = values1;
 static uint8_t* valuesCurrentRead = values2;
 static bool has_new = false;
 
-extern "C" uint8_t* get_current_values(size_t* data_length) {
+extern "C" uint8_t* __time_critical_func(get_current_values)(size_t* data_length) {
     uint8_t* tmp = valuesCurrentRead;
     uint32_t irq = spin_lock_blocking(spin_lock);
     if (has_new) {
