@@ -275,6 +275,13 @@ void pio_spi_free(pio_spi_t* spi) {
     assert(spi->config.pio_idx == 0 || spi->config.pio_idx == 1);
     assert(spi == &pio_spi[spi->config.pio_idx]);
     pio_spi_stop(spi);
+    pio_sm_unclaim(spi->pio, spi->sm_cs);
+    pio_sm_unclaim(spi->pio, spi->sm_initial);
+    pio_sm_unclaim(spi->pio, spi->sm_read);
+    pio_sm_unclaim(spi->pio, spi->sm_write);
+    pio_clear_instruction_memory(spi->pio);
+    dma_channel_unclaim(spi->channel_read);
+    dma_channel_unclaim(spi->channel_write);
     pio_spi[spi->config.pio_idx].allocated = false;
 }
 
