@@ -74,7 +74,6 @@ static void configure_read_dma(PIO pio, uint sm, uint* channel) {
     dma_channel_config channel_config = dma_channel_get_default_config(dma_channel);
     channel_config_set_transfer_data_size(&channel_config, DMA_SIZE_8);
     channel_config_set_dreq(&channel_config, pio_get_dreq(pio, sm, false));
-    //channel_config_set_irq_quiet(&channel_config, true);
     channel_config_set_read_increment(&channel_config, false);
     channel_config_set_write_increment(&channel_config, true);
 
@@ -96,7 +95,6 @@ static void configure_write_dma(PIO pio, uint sm, uint* channel) {
     dma_channel_config channel_config = dma_channel_get_default_config(dma_channel);
     channel_config_set_transfer_data_size(&channel_config, DMA_SIZE_8);
     channel_config_set_dreq(&channel_config, pio_get_dreq(pio, sm, true));
-    //channel_config_set_irq_quiet(&channel_config, true);
     channel_config_set_read_increment(&channel_config, true);
     channel_config_set_write_increment(&channel_config, false);
 
