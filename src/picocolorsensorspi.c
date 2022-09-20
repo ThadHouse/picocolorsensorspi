@@ -99,6 +99,11 @@ int main()
 
     while (1) {
         state = !state;
+        // if (state) {
+        //     pio_spi_start(spi);
+        // } else {
+        //     pio_spi_stop(spi);
+        // }
         gpio_put(LED_PIN, state);
 
         sleep_ms(500);

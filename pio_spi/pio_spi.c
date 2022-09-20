@@ -130,7 +130,7 @@ typedef struct pio_spi_read_info_t {
     uint8_t num_bytes_written;
 } pio_spi_read_info_t;
 
-static pio_spi_read_info_t __time_critical_func(prepare_for_next)(pio_spi_t* spi) {
+static uint __time_critical_func(stop_loops)(pio_spi_t* spi) {
     pio_set_sm_mask_enabled(spi->pio, spi->startstop_mask, false); // Stop state machines
     // Read FIFO count of write buffer
     uint left_in_write_queue = pio_sm_get_tx_fifo_level(spi->pio, spi->sm_write);
@@ -144,6 +144,13 @@ static pio_spi_read_info_t __time_critical_func(prepare_for_next)(pio_spi_t* spi
     pio_sm_exec(spi->pio, spi->sm_write, pio_encode_jmp(spi->offset_write));
     pio_sm_exec(spi->pio, spi->sm_read, pio_encode_jmp(spi->offset_read));
     pio_sm_exec(spi->pio, spi->sm_initial, pio_encode_jmp(spi->offset_initial));
+
+    return left_in_write_queue;
+}
+
+static pio_spi_read_info_t __time_critical_func(prepare_for_next)(pio_spi_t* spi) {
+    // Read FIFO count of write buffer
+    uint left_in_write_queue = stop_loops(spi);
 
     uint8_t reads_remaining = dma_channel_hw_addr(spi->channel_read)->transfer_count;
     uint8_t writes_remaining = dma_channel_hw_addr(spi->channel_write)->transfer_count;
@@ -262,11 +269,12 @@ pio_spi_t* pio_spi_init(const pio_spi_config_t* config) {
     return spi;
 }
 
-void pio_spi_free(const pio_spi_t* spi) {
+void pio_spi_free(pio_spi_t* spi) {
     assert(spi);
     assert(spi->allocated);
     assert(spi->config.pio_idx == 0 || spi->config.pio_idx == 1);
     assert(spi == &pio_spi[spi->config.pio_idx]);
+    pio_spi_stop(spi);
     pio_spi[spi->config.pio_idx].allocated = false;
 }
 
@@ -277,4 +285,19 @@ void pio_spi_start(const pio_spi_t* spi) {
     assert(spi == &pio_spi[spi->config.pio_idx]);
 
     pio_enable_sm_mask_in_sync(spi->pio, (1u << spi->sm_cs) | spi->startstop_mask);
+}
+
+void pio_spi_stop(pio_spi_t* spi) {
+    assert(spi);
+    assert(spi->allocated);
+    assert(spi->config.pio_idx == 0 || spi->config.pio_idx == 1);
+    assert(spi == &pio_spi[spi->config.pio_idx]);
+
+    pio_sm_set_enabled(spi->pio, spi->sm_cs, false);
+    pio_sm_exec(spi->pio, spi->sm_cs, pio_encode_jmp(spi->offset_cs));
+    pio_sm_set_consecutive_pindirs(spi->pio, spi->sm_cs, spi->config.cipo_pin, 1, false);
+
+    stop_loops(spi);
+    dma_channel_abort(spi->channel_read);
+    dma_channel_abort(spi->channel_write);
 }

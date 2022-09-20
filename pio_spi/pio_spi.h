@@ -45,7 +45,7 @@ extern "C" {
 #endif
 
 pio_spi_t* pio_spi_init(const pio_spi_config_t* config);
-void pio_spi_free(const pio_spi_t* spi);
+void pio_spi_free(pio_spi_t* spi);
 
 inline static void pio_spi_provide_read_buffer(pio_spi_t* spi, volatile uint8_t* buf, uint8_t buf_bytes) {
     spi->read_buf_len = buf_bytes;
@@ -58,7 +58,7 @@ inline static void pio_spi_provide_write_buffer(pio_spi_t* spi, volatile uint8_t
 }
 
 void pio_spi_start(const pio_spi_t* spi);
-//void pio_spi_stop(const pio_spi_t* spi);
+void pio_spi_stop(pio_spi_t* spi);
 
 #ifdef __cplusplus
 }
