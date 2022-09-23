@@ -42,14 +42,12 @@ static void __time_critical_func(data_request)(void* ctx, uint8_t reg) {
     if (reg == 2) {
         ptr = current_values + data_length;
     }
-    pio_spi_provide_write_buffer(spi, (volatile uint8_t*)ptr, data_length);
+    pio_spi_provide_write_buffer(spi, (volatile uint8_t*)ptr, 7);
 }
 
-static void __time_critical_func(transaction_ended)(void* ctx, uint8_t num_bytes_read, uint8_t num_bytes_written) {
+static void __time_critical_func(transaction_ended)(void* ctx, uint8_t num_bytes_read, uint8_t num_bytes_written, uint32_t num_bits_transacted) {
     (void)ctx;
-    (void)num_bytes_read;
-    (void)num_bytes_written;
-    SEGGER_RTT_printf(0, "%d %d\n", num_bytes_read, num_bytes_written);
+    SEGGER_RTT_printf(0, "%d %d %d\n", num_bytes_read, num_bytes_written, num_bits_transacted);
     // buffer[0],
     // buffer[1],
     // buffer[2],

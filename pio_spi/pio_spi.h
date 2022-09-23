@@ -25,13 +25,17 @@ typedef void(*pio_spi_transaction_started_func)(void* ctx);
 // This register can be received even if no read buffer is provided.
 typedef void(*pio_spi_data_request_function)(void* ctx, uint8_t reg);
 
-// Called when CS goes high. Provides the number of bytes read, and the
-// number of bytes written.
+// Called when CS goes high. Provides the number of bytes read, the
+// number of bytes written, and the number of bits that were transacted
+// by the controller.
+// The number of bytes written will be 1 more then the actual number of bytes
+// transmitted if less bytes were requested then provided by the DMA buffer.
+// This can also occur if the write fifo is delayed past the first byte.
 // If read or write buffers are known, they can be provided here for the next
 // transaction. If this is done, for the first transaction to be successful,
 // the buffers for the first transaction would need to be provided before
 // starting, as this callback will not occur before the first transaction occurs.
-typedef void(*pio_spi_transaction_ended_func)(void* ctx, uint8_t num_bytes_read, uint8_t num_bytes_written);
+typedef void(*pio_spi_transaction_ended_func)(void* ctx, uint8_t num_bytes_read, uint8_t num_bytes_written, uint32_t num_bits_transacted);
 
 // Configuration options for pio spi
 // All items necessary except for callbacks and callback context

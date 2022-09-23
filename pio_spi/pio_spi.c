@@ -132,12 +132,23 @@ inline static int safe_fifo_rx_wait_for_finish(pio_hw_t *pio, uint sm, uint chan
 typedef struct pio_spi_read_info_t {
     uint8_t num_bytes_read;
     uint8_t num_bytes_written;
+    uint num_bits_transacted;
 } pio_spi_read_info_t;
 
-static uint __time_critical_func(stop_loops)(pio_spi_t* spi) {
+inline static uint read_register(PIO pio, uint sm, enum pio_src_dest reg) {
+    uint move_isr = pio_encode_mov(pio_isr, reg);
+    pio_sm_exec_wait_blocking(pio, sm, move_isr);
+    uint push = pio_encode_push(false, false);
+    pio_sm_exec_wait_blocking(pio, sm, push);
+    return pio_sm_get(pio, sm);
+}
+
+static pio_spi_read_info_t __time_critical_func(stop_loops)(pio_spi_t* spi) {
     pio_set_sm_mask_enabled(spi->pio, spi->startstop_mask, false); // Stop state machines
     // Read FIFO count of write buffer
     uint left_in_write_queue = pio_sm_get_tx_fifo_level(spi->pio, spi->sm_write);
+    pio_sm_clear_fifos(spi->pio, spi->sm_initial);
+    uint bits_transacted = read_register(spi->pio, spi->sm_initial, pio_y);
     pio_restart_sm_mask(spi->pio, spi->startstop_mask); // Restart state machines to known states
     hw_set_bits(&spi->pio->irq, 0xFF); // Clear IRQs
     safe_fifo_rx_wait_for_finish(spi->pio, spi->sm_read, spi->channel_read);
@@ -145,16 +156,27 @@ static uint __time_critical_func(stop_loops)(pio_spi_t* spi) {
     pio_sm_clear_fifos(spi->pio, spi->sm_write);
     pio_sm_clear_fifos(spi->pio, spi->sm_initial);
 
-    pio_sm_exec(spi->pio, spi->sm_write, pio_encode_jmp(spi->offset_write));
-    pio_sm_exec(spi->pio, spi->sm_read, pio_encode_jmp(spi->offset_read));
-    pio_sm_exec(spi->pio, spi->sm_initial, pio_encode_jmp(spi->offset_initial));
+    pio_sm_exec_wait_blocking(spi->pio, spi->sm_write, pio_encode_jmp(spi->offset_write));
+    pio_sm_exec_wait_blocking(spi->pio, spi->sm_read, pio_encode_jmp(spi->offset_read));
+    pio_sm_exec_wait_blocking(spi->pio, spi->sm_initial, pio_encode_jmp(spi->offset_initial));
 
-    return left_in_write_queue;
+    uint irq_wait = pio_encode_wait_irq(1, false, 7);
+    pio_sm_exec(spi->pio, spi->sm_write, irq_wait);
+    pio_sm_exec(spi->pio, spi->sm_read, irq_wait);
+    pio_sm_exec(spi->pio, spi->sm_initial, irq_wait);
+
+    pio_spi_read_info_t ret = {
+        .num_bytes_written = left_in_write_queue,
+        .num_bytes_read = 0,
+        .num_bits_transacted = ((uint)0 - bits_transacted) + 8,
+    };
+
+    return ret;
 }
 
 static pio_spi_read_info_t __time_critical_func(prepare_for_next)(pio_spi_t* spi) {
     // Read FIFO count of write buffer
-    uint left_in_write_queue = stop_loops(spi);
+    pio_spi_read_info_t byte_info = stop_loops(spi);
 
     uint8_t reads_remaining = dma_channel_hw_addr(spi->channel_read)->transfer_count;
     uint8_t writes_remaining = dma_channel_hw_addr(spi->channel_write)->transfer_count;
@@ -164,11 +186,10 @@ static pio_spi_read_info_t __time_critical_func(prepare_for_next)(pio_spi_t* spi
 
     pio_enable_sm_mask_in_sync(spi->pio, spi->startstop_mask);
 
-    pio_spi_read_info_t ret = {
-        .num_bytes_written = spi->write_buf_len ? spi->write_buf_len - writes_remaining - left_in_write_queue : 0,
-        .num_bytes_read = spi->read_buf_len ? spi->read_buf_len - reads_remaining : 0,
-    };
-    return ret;
+    byte_info.num_bytes_written = spi->write_buf_len ? spi->write_buf_len - writes_remaining - byte_info.num_bytes_written : 0;
+    byte_info.num_bytes_read = spi->read_buf_len ? spi->read_buf_len - reads_remaining : 0;
+
+    return byte_info;
 }
 
 static void __time_critical_func(pio_irq)(pio_spi_t* spi) {
@@ -200,7 +221,7 @@ static void __time_critical_func(pio_irq)(pio_spi_t* spi) {
         spi->read_buf_len = 0;
 
         if (spi->config.transaction_ended) {
-            spi->config.transaction_ended(spi->config.callback_ctx, read_info.num_bytes_read, read_info.num_bytes_written);
+            spi->config.transaction_ended(spi->config.callback_ctx, read_info.num_bytes_read, read_info.num_bytes_written, read_info.num_bits_transacted);
         }
         pio_interrupt_clear(spi->pio, 1);
     }
