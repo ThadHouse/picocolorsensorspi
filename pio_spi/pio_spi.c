@@ -177,18 +177,20 @@ static void __time_critical_func(pio_irq)(pio_spi_t* spi) {
     gpio_put(spi->config.dbg_pin, true);
     //SEGGER_RTT_printf(0, "PIO IRQ %x\n", irqs);
     if (irqs & (1u << 0)) {
+
         //SEGGER_RTT_printf(0, "PIO IRQ  DSR\n");
-        uint8_t reg = pio_sm_get_blocking(spi->pio, spi->sm_initial);
+        uint8_t reg = pio_sm_get(spi->pio, spi->sm_initial);
         if (spi->config.data_request) {
             spi->config.data_request(spi->config.callback_ctx, reg);
         }
+        pio_interrupt_clear(spi->pio, 0);
     }
     if (irqs & (1u << 1)) {
         //SEGGER_RTT_printf(0, "PIO IRQ CS Falling\n");
         if (spi->config.transaction_started) {
             spi->config.transaction_started(spi->config.callback_ctx);
         }
-
+        pio_interrupt_clear(spi->pio, 1);
     }
     if (irqs & (1u << 2)) {
         //SEGGER_RTT_printf(0, "PIO IRQ CS Rising\n");
@@ -200,6 +202,7 @@ static void __time_critical_func(pio_irq)(pio_spi_t* spi) {
         if (spi->config.transaction_ended) {
             spi->config.transaction_ended(spi->config.callback_ctx, read_info.num_bytes_read, read_info.num_bytes_written);
         }
+        pio_interrupt_clear(spi->pio, 1);
     }
     gpio_put(spi->config.dbg_pin, false);
 }
