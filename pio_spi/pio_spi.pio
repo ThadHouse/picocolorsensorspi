@@ -1,22 +1,14 @@
-.program spi_loop
+.program spi_combined_loop_clock_rising
+PUBLIC CLOCK_IDLE_HIGH:
+wait 0 pin 1    ; Wait for falling clock edge
+PUBLIC CLOCK_IDLE_LOW:
 .wrap_target
-set x, 7 ; Read 8 bits to start (will loop once more then count)
-initial_loop:
-wait 1 pin 1; Wait for rising clock edge
-in pins, 1 ; Read data pin
-wait 0 pin 1; Wait for falling clock edge
-jmp x-- initial_loop ; Jump initial loop
-.wrap
-
-.program spi_write_loop
-.wrap_target
-pull noblock
-set y 7
-loop:
-out pins, 1 ; write out pin
-wait 1 pin 1 ; wait for rising clock edge
-wait 0 pin 1; Wait for falling clock edge
-jmp y-- loop
+pull ifempty noblock    ; Pull if there is data
+out pins 1      ; Write CIPO
+wait 1 pin 1    ; Wait for rising clock edge
+in pins 1       ; Read COPI
+push iffull noblock ; Push if we've read 8 bits, but don't block if fifo is full
+wait 0 pin 1    ; Wait for falling clock edge
 .wrap
 
 .program spi_cs_loop

@@ -59,15 +59,13 @@ typedef struct pio_spi_config_t {
 typedef struct pio_spi_t {
     bool allocated;
     PIO pio;
-    uint sm_write;
-    uint offset_write;
+    uint sm_combined;
+    uint offset_combined;
     uint sm_cs;
     uint offset_cs;
     uint sm_initial;
     uint offset_initial;
     uint channel_write;
-    uint sm_read;
-    uint offset_read;
     uint channel_read;
     uint32_t startstop_mask;
     pio_spi_config_t config;

@@ -35,10 +35,10 @@ static void setup_read_initial_sm(PIO pio, int copi_pin, uint *sm, uint* offset)
     pio_sm_init(pio, *sm, *offset, &c);
 }
 
-static void setup_write_sm(PIO pio, int cipo_pin, int copi_pin, uint *sm, uint* offset) {
-    *offset = pio_add_program(pio, &spi_write_loop_program);
+static void setup_combined_sm(PIO pio, int cipo_pin, int copi_pin, uint *sm, uint* offset) {
+    *offset = pio_add_program(pio, &spi_combined_loop_clock_rising_program);
     *sm = pio_claim_unused_sm(pio, true);
-    pio_sm_config c = spi_write_loop_program_get_default_config(*offset);
+    pio_sm_config c = spi_combined_loop_clock_rising_program_get_default_config(*offset);
     sm_config_set_in_pins(&c, copi_pin);
     sm_config_set_out_pins(&c, cipo_pin, 1);
     pio_gpio_init(pio, cipo_pin);
@@ -49,22 +49,13 @@ static void setup_write_sm(PIO pio, int cipo_pin, int copi_pin, uint *sm, uint* 
         false,  // Autopush enabled
         8      // Autopush threshold = 8
     );
-    pio_sm_init(pio, *sm, *offset, &c);
-}
-
-static void setup_read_sm(PIO pio, int copi_pin, uint *sm, uint* offset) {
-    *offset = pio_add_program(pio, &spi_loop_program);
-    *sm = pio_claim_unused_sm(pio, true);
-    pio_sm_config c = spi_loop_program_get_default_config(*offset);
-    sm_config_set_in_pins(&c, copi_pin);
 
     sm_config_set_in_shift(
         &c,
         false, // Shift-to-right = false (i.e. shift to left)
-        true,  // Autopush enabled
+        false,  // Autopush enabled
         8      // Autopush threshold = 8
     );
-
     pio_sm_init(pio, *sm, *offset, &c);
 }
 
@@ -146,23 +137,21 @@ inline static uint read_register(PIO pio, uint sm, enum pio_src_dest reg) {
 static pio_spi_read_info_t __time_critical_func(stop_loops)(pio_spi_t* spi) {
     pio_set_sm_mask_enabled(spi->pio, spi->startstop_mask, false); // Stop state machines
     // Read FIFO count of write buffer
-    uint left_in_write_queue = pio_sm_get_tx_fifo_level(spi->pio, spi->sm_write);
+    uint left_in_write_queue = pio_sm_get_tx_fifo_level(spi->pio, spi->sm_combined);
     pio_sm_clear_fifos(spi->pio, spi->sm_initial);
     uint bits_transacted = read_register(spi->pio, spi->sm_initial, pio_y);
     pio_restart_sm_mask(spi->pio, spi->startstop_mask); // Restart state machines to known states
     hw_set_bits(&spi->pio->irq, 0xFF); // Clear IRQs
-    safe_fifo_rx_wait_for_finish(spi->pio, spi->sm_read, spi->channel_read);
-    pio_sm_clear_fifos(spi->pio, spi->sm_read);
-    pio_sm_clear_fifos(spi->pio, spi->sm_write);
+    safe_fifo_rx_wait_for_finish(spi->pio, spi->sm_combined, spi->channel_read);
+    pio_sm_clear_fifos(spi->pio, spi->sm_combined);
     pio_sm_clear_fifos(spi->pio, spi->sm_initial);
 
-    pio_sm_exec_wait_blocking(spi->pio, spi->sm_write, pio_encode_jmp(spi->offset_write));
-    pio_sm_exec_wait_blocking(spi->pio, spi->sm_read, pio_encode_jmp(spi->offset_read));
+    // TODO this is where I'd skip 1 on mode 0
+    pio_sm_exec_wait_blocking(spi->pio, spi->sm_combined, pio_encode_jmp(spi->offset_combined));
     pio_sm_exec_wait_blocking(spi->pio, spi->sm_initial, pio_encode_jmp(spi->offset_initial));
 
     uint irq_wait = pio_encode_wait_irq(1, false, 7);
-    pio_sm_exec(spi->pio, spi->sm_write, irq_wait);
-    pio_sm_exec(spi->pio, spi->sm_read, irq_wait);
+    pio_sm_exec(spi->pio, spi->sm_combined, irq_wait);
     pio_sm_exec(spi->pio, spi->sm_initial, irq_wait);
 
     pio_spi_read_info_t ret = {
@@ -265,11 +254,10 @@ pio_spi_t* pio_spi_init(const pio_spi_config_t* config) {
     gpio_set_pulls(config->copi_pin, false, false);
     gpio_set_pulls(config->cipo_pin, false, false);
 
-    setup_write_sm(spi->pio, spi->config.cipo_pin, spi->config.copi_pin, &spi->sm_write, &spi->offset_write);
-    configure_write_dma(spi->pio, spi->sm_write, &spi->channel_write);
+    setup_combined_sm(spi->pio, spi->config.cipo_pin, spi->config.copi_pin, &spi->sm_combined, &spi->offset_combined);
+    configure_write_dma(spi->pio, spi->sm_combined, &spi->channel_write);
 
-    setup_read_sm(spi->pio, spi->config.copi_pin, &spi->sm_read, &spi->offset_read);
-    configure_read_dma(spi->pio, spi->sm_read, &spi->channel_read);
+    configure_read_dma(spi->pio, spi->sm_combined, &spi->channel_read);
 
     setup_read_initial_sm(spi->pio, spi->config.copi_pin, &spi->sm_initial, &spi->offset_initial);
 
@@ -290,7 +278,7 @@ pio_spi_t* pio_spi_init(const pio_spi_config_t* config) {
         irq_set_enabled(PIO1_IRQ_0, true);
     }
 
-    spi->startstop_mask = (1u << spi->sm_write) | (1u << spi->sm_read) | (1u << spi->sm_initial);
+    spi->startstop_mask = (1u << spi->sm_combined) | (1u << spi->sm_initial);
 
     prepare_for_next(spi);
 
@@ -305,8 +293,7 @@ void pio_spi_free(pio_spi_t* spi) {
     pio_spi_stop(spi);
     pio_sm_unclaim(spi->pio, spi->sm_cs);
     pio_sm_unclaim(spi->pio, spi->sm_initial);
-    pio_sm_unclaim(spi->pio, spi->sm_read);
-    pio_sm_unclaim(spi->pio, spi->sm_write);
+    pio_sm_unclaim(spi->pio, spi->sm_combined);
     pio_clear_instruction_memory(spi->pio);
     dma_channel_unclaim(spi->channel_read);
     dma_channel_unclaim(spi->channel_write);
