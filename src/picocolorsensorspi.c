@@ -87,8 +87,8 @@ int main()
         .pio_idx = 0,
     };
 
-    //spi = pio_spi_init(&config);
-    //pio_spi_start(spi);
+    spi = pio_spi_init(&config);
+    pio_spi_start(spi);
 
     // Run a heartbeat
     const uint LED_PIN = PICO_DEFAULT_LED_PIN;
@@ -99,13 +99,13 @@ int main()
 
     while (1) {
         state = !state;
-        if (state) {
-            spi = pio_spi_init(&config);
-            pio_spi_start(spi);
-        } else {
-            pio_spi_stop(spi);
-            pio_spi_free(spi);
-        }
+        // if (state) {
+        //     spi = pio_spi_init(&config);
+        //     pio_spi_start(spi);
+        // } else {
+        //     pio_spi_stop(spi);
+        //     pio_spi_free(spi);
+        // }
         gpio_put(LED_PIN, state);
 
         sleep_ms(500);

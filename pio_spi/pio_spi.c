@@ -86,6 +86,9 @@ static void configure_read_dma(PIO pio, uint sm, uint* channel) {
         false
     );
 
+    dma_channel_set_irq0_enabled(dma_channel, false);
+    dma_channel_set_irq1_enabled(dma_channel, false);
+
     *channel = dma_channel;
 }
 
@@ -106,6 +109,9 @@ static void configure_write_dma(PIO pio, uint sm, uint* channel) {
         1,  					// transfer count
         false
     );
+
+    dma_channel_set_irq0_enabled(dma_channel, false);
+    dma_channel_set_irq1_enabled(dma_channel, false);
 
     *channel = dma_channel;
 }
