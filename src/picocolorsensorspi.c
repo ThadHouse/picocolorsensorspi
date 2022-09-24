@@ -90,6 +90,7 @@ int main()
         .pio_idx = 0,
         .cs_active_high = false,
         .trigger_on_falling = false,
+        .default_write_value = 42
     };
 
     spi = pio_spi_init(&config);

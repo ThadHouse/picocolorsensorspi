@@ -44,7 +44,7 @@ static void setup_read_initial_sm(PIO pio, int copi_pin, uint offset) {
     pio_sm_init(pio, sm, offset, &c);
 }
 
-static void setup_combined_sm(PIO pio, int cipo_pin, int copi_pin, uint* offset) {
+static void setup_combined_sm(PIO pio, int cipo_pin, int copi_pin, uint8_t default_write_value, uint* offset) {
     *offset = pio_add_program(pio, &spi_combined_loop_program);
     uint sm = COMBINED_SM;
     pio_sm_claim(pio, sm);
@@ -52,6 +52,10 @@ static void setup_combined_sm(PIO pio, int cipo_pin, int copi_pin, uint* offset)
     sm_config_set_in_pins(&c, copi_pin);
     sm_config_set_out_pins(&c, cipo_pin, 1);
     pio_gpio_init(pio, cipo_pin);
+
+    pio_sm_put(pio, sm, ((uint)default_write_value) << 24);
+    pio_sm_exec_wait_blocking(pio, sm, pio_encode_pull(false, true));
+    pio_sm_exec_wait_blocking(pio, sm, pio_encode_mov(pio_x, pio_osr));
 
     sm_config_set_out_shift(
         &c,
@@ -283,7 +287,7 @@ pio_spi_t* pio_spi_init(const pio_spi_config_t* config) {
     gpio_set_pulls(config->copi_pin, false, false);
     gpio_set_pulls(config->cipo_pin, false, false);
 
-    setup_combined_sm(spi->pio, spi->config.cipo_pin, spi->config.copi_pin, &spi->offset_combined);
+    setup_combined_sm(spi->pio, spi->config.cipo_pin, spi->config.copi_pin, spi->config.default_write_value, &spi->offset_combined);
     configure_write_dma(spi->pio, &spi->channel_write);
 
     configure_read_dma(spi->pio, &spi->channel_read);

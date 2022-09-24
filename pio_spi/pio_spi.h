@@ -49,8 +49,13 @@ typedef struct pio_spi_config_t {
                     // and written low at the end. Useful for debugging timing
                     // issues between ISRs and data bytes
 
-    bool cs_active_high;
-    bool trigger_on_falling;
+    bool cs_active_high; // True to have CS pin be active high, false for active low
+    bool trigger_on_falling; // True to trigger on the falling edge rather then rising edge.
+    // Theres no variable for clock phase, however modes 1 and 3 (clock idles in triggered state)
+    // are better, as the initial write DMA is only pulled when the clock is pulled away from idle
+    // rather then as soon as the CS pin is triggered
+
+    uint8_t default_write_value; // The byte value to write when there is no data available from the write FIFO.
 
     pio_spi_transaction_started_func transaction_started;
     pio_spi_data_request_function data_request;
