@@ -260,6 +260,9 @@ pio_spi_t* pio_spi_init(const pio_spi_config_t* config) {
     spi->allocated = true;
 
     spi->config = *config;
+    if (config->sck_pin != config->copi_pin + 1) {
+        panic("SCK pin must be 1 after COPI");
+    }
     spi->pio = config->pio_idx == 0 ? pio0 : pio1;
 
     gpio_init(config->dbg_pin);
