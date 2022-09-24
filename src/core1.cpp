@@ -158,7 +158,7 @@ void init_device(i2c_inst_t *i2c, uint8_t *i2cBuffer)
     // i2c_write_timeout_us(i2c, kAddress, i2cBuffer, 2, false, 25000);
 }
 
-static constexpr const size_t data_buf_size = 18;
+static constexpr const uint8_t data_buf_size = 18;
 
 static uint8_t values0[data_buf_size * 2];
 static uint8_t values1[data_buf_size * 2];
@@ -169,7 +169,7 @@ static uint8_t* valuesCurrentCache = values1;
 static uint8_t* valuesCurrentRead = values2;
 static bool has_new = false;
 
-extern "C" uint8_t* __time_critical_func(get_current_values)(size_t* data_length) {
+extern "C" uint8_t* __time_critical_func(get_current_values)(uint8_t* data_length) {
     uint8_t* tmp = valuesCurrentRead;
     uint32_t irq = spin_lock_blocking(spin_lock);
     if (has_new) {

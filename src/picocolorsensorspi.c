@@ -16,11 +16,13 @@
 
 #define PIN_DBG  15
 
-uint8_t* current_values = NULL;
-size_t data_length;
+uint8_t blank_buffer[64];
+
+uint8_t* current_values = blank_buffer;
+uint8_t data_length;
 spin_lock_t* spin_lock = NULL;
 
-extern uint8_t* get_current_values(size_t* data_length);
+extern uint8_t* get_current_values(uint8_t* data_length);
 
 static pio_spi_t* spi;
 static volatile uint8_t dma_buf[256];
@@ -28,24 +30,17 @@ static volatile uint8_t write_buf[] = {1, 2, 3, 4, 5, 6};
 
 static void __time_critical_func(transaction_started)(void* ctx) {
     (void)ctx;
-    pio_spi_provide_write_buffer(spi, write_buf, sizeof(write_buf));
+    //pio_spi_provide_write_buffer(spi, write_buf, sizeof(write_buf));
     current_values = get_current_values(&data_length);
 }
 
 static void __time_critical_func(data_request)(void* ctx, uint8_t reg) {
     (void)ctx;
     (void)reg;
-    //return NULL;
-    SEGGER_RTT_printf(0, "%3x\n", reg);
     uint8_t* ptr = current_values;
-    if (current_values == NULL) {
-        return;
-    }
-    if (reg == 2) {
-        ptr = current_values + data_length;
-    }
+    uintptr_t offset = reg == 1 ? 18 : 0;
     (void)ptr;
-    //pio_spi_provide_write_buffer(spi, (volatile uint8_t*)ptr, 7);
+    pio_spi_provide_write_buffer(spi, (volatile uint8_t*)ptr + offset, 18);
 }
 
 static void __time_critical_func(transaction_ended)(void* ctx, uint8_t num_bytes_read, uint8_t num_bytes_written, uint32_t num_bits_transacted) {
@@ -92,7 +87,7 @@ int main()
         .dbg_pin = PIN_DBG,
         .sck_pin = PIN_SCK,
         .pio_idx = 0,
-        .cs_active_high = true,
+        .cs_active_high = false,
         .trigger_on_falling = false,
     };
 

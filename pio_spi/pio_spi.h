@@ -62,18 +62,15 @@ typedef struct pio_spi_config_t {
 typedef struct pio_spi_t {
     bool allocated;
     PIO pio;
-    uint sm_combined;
     uint offset_combined;
-    uint sm_cs;
     uint offset_cs;
-    uint sm_initial;
-    uint offset_initial;
     uint channel_write;
     uint channel_read;
     uint32_t startstop_mask;
     pio_spi_config_t config;
     uint8_t write_buf_len;
     uint8_t read_buf_len;
+    uint32_t dgb_mask;
 } pio_spi_t;
 
 #ifdef __cplusplus
@@ -88,14 +85,14 @@ void pio_spi_free(pio_spi_t* spi);
 
 // Provide the read buffer for DMA. Must be called per transaction if read data is requested,
 // but at max once per transaction.
-inline static void pio_spi_provide_read_buffer(pio_spi_t* spi, volatile uint8_t* buf, uint8_t buf_bytes) {
+__force_inline static void pio_spi_provide_read_buffer(pio_spi_t* spi, volatile uint8_t* buf, uint8_t buf_bytes) {
     spi->read_buf_len = buf_bytes;
     dma_channel_transfer_to_buffer_now(spi->channel_read, buf, buf_bytes);
 }
 
 // Provide the write buffer for DMA. Must be called per transaction if write data is requested,
 // but at max once per transaction.
-inline static void pio_spi_provide_write_buffer(pio_spi_t* spi, volatile uint8_t* buf, uint8_t buf_bytes) {
+__force_inline static void pio_spi_provide_write_buffer(pio_spi_t* spi, volatile uint8_t* buf, uint8_t buf_bytes) {
     spi->write_buf_len = buf_bytes;
     dma_channel_transfer_from_buffer_now(spi->channel_write, buf, buf_bytes);
 }
