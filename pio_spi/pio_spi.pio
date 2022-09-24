@@ -1,39 +1,24 @@
-.program spi_combined_loop_clock_rising
-PUBLIC CLOCK_IDLE_HIGH:
+.program spi_combined_loop
+wait_falling:
 wait 0 pin 1    ; Wait for falling clock edge
-PUBLIC CLOCK_IDLE_LOW:
-.wrap_target
+initial_loop:
 pull ifempty noblock    ; Pull if there is data
 out pins 1      ; Write CIPO
 wait 1 pin 1    ; Wait for rising clock edge
 in pins 1       ; Read COPI
 push iffull noblock ; Push if we've read 8 bits, but don't block if fifo is full
-wait 0 pin 1    ; Wait for falling clock edge
 .wrap
+.wrap_target
+jmp wait_falling
+public initial_check:
+jmp y-- wait_falling
+IRQ set 0 ; Trigger data set irq
+jmp wait_falling
 
 .program spi_cs_loop
-wait 0 pin 0 ; wait for falling edge of cs pin
-set pindirs 1
-irq set 7
-irq set 1 ; trigger falling edge irq
-wait 1 pin 0 ; wait for rising edge of cs pin
-set pindirs 0
-irq set 2 ; trigger rising edge irq
-
-.program spi_initial_loop
-set y, 0
-set x, 7 ; Read 8 bits to start (will loop once more then count)
-jmp initial_loop_rising
-initial_loop:
-wait 0 pin 1; Wait for falling clock edge
-initial_loop_rising:
-wait 1 pin 1; Wait for rising clock edge
-in pins, 1 ; Read data pin
-jmp x-- initial_loop ; Jump initial loop
-IRQ set 0 ; Trigger data set irq
-.wrap_target
-bit_transacted:
-wait 0 pin 1
-wait 1 pin 1
-jmp y-- bit_transacted
-.wrap
+.side_set 1
+wait 0 pin 0 side 0 ; wait for falling edge of cs pin
+irq set 7 side 1
+irq set 1 side 1 ; trigger falling edge irq
+wait 1 pin 0 side 1 ; wait for rising edge of cs pin
+irq set 2 side 0; trigger rising edge irq

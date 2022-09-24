@@ -36,6 +36,7 @@ static void __time_critical_func(data_request)(void* ctx, uint8_t reg) {
     (void)ctx;
     (void)reg;
     //return NULL;
+    SEGGER_RTT_printf(0, "%3x\n", reg);
     uint8_t* ptr = current_values;
     if (current_values == NULL) {
         return;
@@ -49,6 +50,9 @@ static void __time_critical_func(data_request)(void* ctx, uint8_t reg) {
 
 static void __time_critical_func(transaction_ended)(void* ctx, uint8_t num_bytes_read, uint8_t num_bytes_written, uint32_t num_bits_transacted) {
     (void)ctx;
+    (void)num_bytes_read;
+    (void)num_bytes_written;
+    (void)num_bits_transacted;
     pio_spi_provide_read_buffer(spi, dma_buf, 255);
 
     SEGGER_RTT_printf(0, "%d %d %d\n", num_bytes_read, num_bytes_written, num_bits_transacted);
@@ -88,9 +92,12 @@ int main()
         .dbg_pin = PIN_DBG,
         .sck_pin = PIN_SCK,
         .pio_idx = 0,
+        .cs_active_high = true,
+        .trigger_on_falling = false,
     };
 
     spi = pio_spi_init(&config);
+    pio_spi_provide_read_buffer(spi, dma_buf, 255);
     pio_spi_start(spi);
 
     // Run a heartbeat

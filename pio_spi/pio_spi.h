@@ -49,6 +49,9 @@ typedef struct pio_spi_config_t {
                     // and written low at the end. Useful for debugging timing
                     // issues between ISRs and data bytes
 
+    bool cs_active_high;
+    bool trigger_on_falling;
+
     pio_spi_transaction_started_func transaction_started;
     pio_spi_data_request_function data_request;
     pio_spi_transaction_ended_func transaction_ended;

@@ -3,6 +3,7 @@
 #include "hardware/pio.h"
 #include "hardware/gpio.h"
 #include "hardware/dma.h"
+#include "hardware/spi.h"
 #include "SEGGER_RTT.h"
 #include <string.h>
 
@@ -13,22 +14,23 @@ static void setup_cs_sm(PIO pio, int cipo_pin, int cs_pin, uint* sm, uint* offse
     *sm = pio_claim_unused_sm(pio, true);
     pio_sm_config c = spi_cs_loop_program_get_default_config(*offset);
     sm_config_set_in_pins(&c, cs_pin);
-    sm_config_set_set_pins(&c, cipo_pin, 1);
+    sm_config_set_sideset(&c, 1, false, true);
+    sm_config_set_sideset_pins(&c, cipo_pin);
     pio_sm_set_consecutive_pindirs(pio, *sm, cipo_pin, 1, false);
 
     pio_sm_init(pio, *sm, *offset, &c);
 }
 
 static void setup_read_initial_sm(PIO pio, int copi_pin, uint *sm, uint* offset) {
-    *offset = pio_add_program(pio, &spi_initial_loop_program);
     *sm = pio_claim_unused_sm(pio, true);
-    pio_sm_config c = spi_initial_loop_program_get_default_config(*offset);
+    pio_sm_config c = pio_get_default_sm_config();
+    sm_config_set_wrap(&c, *offset + spi_combined_loop_offset_initial_check, *offset + spi_combined_loop_wrap);
     sm_config_set_in_pins(&c, copi_pin);
 
     sm_config_set_in_shift(
         &c,
         false, // Shift-to-right = false (i.e. shift to left)
-        true,  // Autopush enabled
+        false,  // Autopush enabled
         8      // Autopush threshold = 8
     );
 
@@ -36,9 +38,9 @@ static void setup_read_initial_sm(PIO pio, int copi_pin, uint *sm, uint* offset)
 }
 
 static void setup_combined_sm(PIO pio, int cipo_pin, int copi_pin, uint *sm, uint* offset) {
-    *offset = pio_add_program(pio, &spi_combined_loop_clock_rising_program);
+    *offset = pio_add_program(pio, &spi_combined_loop_program);
     *sm = pio_claim_unused_sm(pio, true);
-    pio_sm_config c = spi_combined_loop_clock_rising_program_get_default_config(*offset);
+    pio_sm_config c = spi_combined_loop_program_get_default_config(*offset);
     sm_config_set_in_pins(&c, copi_pin);
     sm_config_set_out_pins(&c, cipo_pin, 1);
     pio_gpio_init(pio, cipo_pin);
@@ -146,8 +148,8 @@ static pio_spi_read_info_t __time_critical_func(stop_loops)(pio_spi_t* spi) {
     pio_sm_clear_fifos(spi->pio, spi->sm_combined);
     pio_sm_clear_fifos(spi->pio, spi->sm_initial);
 
-    // TODO this is where I'd skip 1 on mode 0
     pio_sm_exec_wait_blocking(spi->pio, spi->sm_combined, pio_encode_jmp(spi->offset_combined));
+    pio_sm_exec_wait_blocking(spi->pio, spi->sm_initial, pio_encode_set(pio_y, 7));
     pio_sm_exec_wait_blocking(spi->pio, spi->sm_initial, pio_encode_jmp(spi->offset_initial));
 
     uint irq_wait = pio_encode_wait_irq(1, false, 7);
@@ -157,7 +159,7 @@ static pio_spi_read_info_t __time_critical_func(stop_loops)(pio_spi_t* spi) {
     pio_spi_read_info_t ret = {
         .num_bytes_written = left_in_write_queue,
         .num_bytes_read = 0,
-        .num_bits_transacted = ((uint)0 - bits_transacted) + 8,
+        .num_bits_transacted = ((uint)0 - bits_transacted) + 7,
     };
 
     return ret;
@@ -259,9 +261,18 @@ pio_spi_t* pio_spi_init(const pio_spi_config_t* config) {
 
     configure_read_dma(spi->pio, spi->sm_combined, &spi->channel_read);
 
+    spi->offset_initial = spi->offset_combined;
     setup_read_initial_sm(spi->pio, spi->config.copi_pin, &spi->sm_initial, &spi->offset_initial);
 
     setup_cs_sm(spi->pio, spi->config.cipo_pin, spi->config.cs_pin, &spi->sm_cs, &spi->offset_cs);
+
+    if (spi->config.cs_active_high) {
+        gpio_set_inover(spi->config.cs_pin, GPIO_OVERRIDE_INVERT);
+    }
+
+    if (spi->config.trigger_on_falling) {
+        gpio_set_inover(spi->config.sck_pin, GPIO_OVERRIDE_INVERT);
+    }
 
     if (config->data_request) {
         pio_set_irq0_source_enabled(spi->pio, pis_interrupt0, true);
