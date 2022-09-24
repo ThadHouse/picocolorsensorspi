@@ -52,7 +52,7 @@ static void __time_critical_func(transaction_ended)(void* ctx, uint8_t num_bytes
     pio_spi_provide_write_buffer_length(spi, 18);
 
     SEGGER_RTT_printf(0, "%d %d %d\n", num_bytes_read, num_bytes_written, num_bits_transacted);
-    SEGGER_RTT_printf(0,"%2x %2x %2x %2x %2x %2x %2x\n",
+    SEGGER_RTT_printf(0,"%2x %2x %2x %2x %2x %2x %2x %2x\n",
         dma_buf[0],
         dma_buf[1],
         dma_buf[2],
