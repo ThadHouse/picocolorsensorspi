@@ -10,6 +10,8 @@
 #define CS_SM 1
 #define COMBINED_SM 2
 
+#define RUN_DBG_LEDS_DURING_DATA_REQUEST
+
 pio_spi_t pio_spi[2];
 
 static void setup_cs_sm(PIO pio, int cipo_pin, int cs_pin, uint* offset) {
@@ -224,19 +226,29 @@ static void __time_critical_func(pio_irq_1)(void) {
 }
 
 static void __time_critical_func(pio_data_irq_0)(void) {
-    gpio_put(15, true);
+#ifdef RUN_DBG_LEDS_DURING_DATA_REQUEST
+    gpio_put(pio_spi[0].config.dbg_pin, true);
+#endif
     uint8_t reg = pio0->rxf[INITIAL_SM];
     pio_spi_config_t* cfg = &pio_spi[0].config;
     cfg->data_request(cfg->callback_ctx, reg);
     hw_set_bits(&pio0->irq, (1u << 0));
-    gpio_put(15, false);
+#ifdef RUN_DBG_LEDS_DURING_DATA_REQUEST
+    gpio_put(pio_spi[0].config.dbg_pin, false);
+#endif
 }
 
 static void __time_critical_func(pio_data_irq_1)(void) {
+#ifdef RUN_DBG_LEDS_DURING_DATA_REQUEST
+    gpio_put(pio_spi[1].config.dbg_pin, true);
+#endif
     uint8_t reg = pio1->rxf[INITIAL_SM];
     pio_spi_config_t* cfg = &pio_spi[1].config;
     cfg->data_request(cfg->callback_ctx, reg);
     hw_set_bits(&pio1->irq, (1u << 0));
+#ifdef RUN_DBG_LEDS_DURING_DATA_REQUEST
+    gpio_put(pio_spi[1].config.dbg_pin, true);
+#endif
 }
 
 pio_spi_t* pio_spi_init(const pio_spi_config_t* config) {

@@ -97,6 +97,32 @@ __force_inline static void pio_spi_provide_write_buffer(pio_spi_t* spi, volatile
     dma_channel_transfer_from_buffer_now(spi->channel_write, buf, buf_bytes);
 }
 
+__force_inline static dma_channel_hw_t* pio_spi_get_dma_read_channel(pio_spi_t* spi) {
+    return dma_channel_hw_addr(spi->channel_read);
+}
+
+__force_inline static dma_channel_hw_t* pio_spi_get_dma_write_channel(pio_spi_t* spi) {
+    return dma_channel_hw_addr(spi->channel_write);
+}
+
+__force_inline static void pio_spi_provide_write_buffer_direct(dma_channel_hw_t* hw, const volatile void* buf, uint8_t buf_bytes) {
+    hw->read_addr = (uintptr_t) buf;
+    hw->al1_transfer_count_trig = buf_bytes;
+}
+
+__force_inline static void pio_spi_provide_read_buffer_direct(dma_channel_hw_t* hw, volatile void* buf, uint8_t buf_bytes) {
+    hw->write_addr = (uintptr_t) buf;
+    hw->al1_transfer_count_trig = buf_bytes;
+}
+
+__force_inline static void pio_spi_provide_write_buffer_length(pio_spi_t* spi, uint8_t buf_bytes) {
+    spi->write_buf_len = buf_bytes;
+}
+
+__force_inline static void pio_spi_provide_read_buffer_length(pio_spi_t* spi, uint8_t buf_bytes) {
+    spi->read_buf_len = buf_bytes;
+}
+
 // Start the pio spi engine.
 void pio_spi_start(const pio_spi_t* spi);
 // Stop the pio spi engine.

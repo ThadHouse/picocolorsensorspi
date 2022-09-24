@@ -28,6 +28,8 @@ static pio_spi_t* spi;
 static volatile uint8_t dma_buf[256];
 static volatile uint8_t write_buf[] = {1, 2, 3, 4, 5, 6};
 
+static dma_channel_hw_t* write_dma;
+
 static void __time_critical_func(transaction_started)(void* ctx) {
     (void)ctx;
     //pio_spi_provide_write_buffer(spi, write_buf, sizeof(write_buf));
@@ -36,11 +38,9 @@ static void __time_critical_func(transaction_started)(void* ctx) {
 
 static void __time_critical_func(data_request)(void* ctx, uint8_t reg) {
     (void)ctx;
-    (void)reg;
     uint8_t* ptr = current_values;
     uintptr_t offset = reg == 1 ? 18 : 0;
-    (void)ptr;
-    pio_spi_provide_write_buffer(spi, (volatile uint8_t*)ptr + offset, 18);
+    pio_spi_provide_write_buffer_direct(write_dma, (volatile uint8_t*)ptr + offset, 18);
 }
 
 static void __time_critical_func(transaction_ended)(void* ctx, uint8_t num_bytes_read, uint8_t num_bytes_written, uint32_t num_bits_transacted) {
@@ -49,6 +49,7 @@ static void __time_critical_func(transaction_ended)(void* ctx, uint8_t num_bytes
     (void)num_bytes_written;
     (void)num_bits_transacted;
     pio_spi_provide_read_buffer(spi, dma_buf, 255);
+    pio_spi_provide_write_buffer_length(spi, 18);
 
     SEGGER_RTT_printf(0, "%d %d %d\n", num_bytes_read, num_bytes_written, num_bits_transacted);
     SEGGER_RTT_printf(0,"%2x %2x %2x %2x %2x %2x %2x\n",
@@ -92,6 +93,7 @@ int main()
     };
 
     spi = pio_spi_init(&config);
+    write_dma = pio_spi_get_dma_write_channel(spi);
     pio_spi_provide_read_buffer(spi, dma_buf, 255);
     pio_spi_start(spi);
 
