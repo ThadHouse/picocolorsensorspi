@@ -16,7 +16,7 @@ IRQ set 0 ; Trigger data set irq
 jmp wait_falling
 
 .program spi_cs_loop
-.side_set 1
+.side_set 1 pindirs
 wait 0 pin 0 side 0 ; wait for falling edge of cs pin
 irq set 7 side 1
 irq set 1 side 1 ; trigger falling edge irq

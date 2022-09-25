@@ -20,7 +20,6 @@ static void setup_cs_sm(PIO pio, int cipo_pin, int cs_pin, uint* offset) {
     pio_sm_claim(pio, sm);
     pio_sm_config c = spi_cs_loop_program_get_default_config(*offset);
     sm_config_set_in_pins(&c, cs_pin);
-    sm_config_set_sideset(&c, 1, false, true);
     sm_config_set_sideset_pins(&c, cipo_pin);
     pio_sm_set_consecutive_pindirs(pio, sm, cipo_pin, 1, false);
 
