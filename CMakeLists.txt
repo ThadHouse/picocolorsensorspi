@@ -25,10 +25,12 @@ add_executable(picocolorsensorspi
         src/core1.cpp
         pio_spi/pio_spi.c
         segger/SEGGER_RTT_printf.c
-        segger/SEGGER_RTT.c)
+        segger/SEGGER_RTT.c
+        controller/spi_controller.c)
 
 target_include_directories(picocolorsensorspi PRIVATE segger)
 target_include_directories(picocolorsensorspi PRIVATE pio_spi)
+target_include_directories(picocolorsensorspi PRIVATE controller)
 
 pico_generate_pio_header(picocolorsensorspi ${CMAKE_CURRENT_LIST_DIR}/pio_spi/pio_spi.pio)
 

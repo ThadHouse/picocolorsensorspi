@@ -5,7 +5,9 @@
 #include "pico/multicore.h"
 #include "pio_spi.h"
 #include "SEGGER_RTT.h"
+#include "spi_controller.h"
 #include <stdint.h>
+#include <string.h>
 
 // SPI Defines
 // Any pins can be used, but SCK must be 1 after COPI
@@ -39,7 +41,14 @@ static void __time_critical_func(transaction_started)(void* ctx) {
 static void __time_critical_func(data_request)(void* ctx, uint8_t reg) {
     (void)ctx;
     uint8_t* ptr = current_values;
-    uintptr_t offset = reg == 1 ? 18 : 0;
+    uintptr_t offset;
+    if (reg == 1) {
+        offset = 0;
+    } else if (reg == 2) {
+        offset = 18;
+    } else {
+        return;
+    }
     pio_spi_provide_write_buffer_direct(write_dma, (volatile uint8_t*)ptr + offset, 18);
 }
 
@@ -51,7 +60,7 @@ static void __time_critical_func(transaction_ended)(void* ctx, uint8_t num_bytes
     pio_spi_provide_read_buffer(spi, dma_buf, 255);
     pio_spi_provide_write_buffer_length(spi, 18);
 
-    SEGGER_RTT_printf(0, "%d %d %d\n", num_bytes_read, num_bytes_written, num_bits_transacted);
+    // SEGGER_RTT_printf(0, "%d %d %d\n", num_bytes_read, num_bytes_written, num_bits_transacted);
     SEGGER_RTT_printf(0,"%2x %2x %2x %2x %2x %2x %2x %2x\n",
         dma_buf[0],
         dma_buf[1],
@@ -98,6 +107,18 @@ int main()
     pio_spi_provide_read_buffer(spi, dma_buf, 255);
     pio_spi_start(spi);
 
+    spi_controller_config_t cconfig = {
+        .cipo_pin = 19,
+        .copi_pin = 16,
+        .sck_pin = 18,
+        .cs_pin = 12,
+        .cs_active_high = false,
+        .frequency = 20000000,
+        .mode = 3,
+        .spi_idx = 0,
+    };
+    spi_controller_t* controller = spi_controller_initialize(&cconfig);
+
     // Run a heartbeat
     const uint LED_PIN = PICO_DEFAULT_LED_PIN;
     gpio_init(LED_PIN);
@@ -105,16 +126,23 @@ int main()
 
     bool state = false;
 
+    uint8_t cbuffer[8] = {1, 2, 3, 4, 5, 6, 7, 8};
+
     while (1) {
         state = !state;
         // if (state) {
-        //     spi = pio_spi_init(&config);
+        //     spi = pio_spi_init(&config);125
         //     pio_spi_start(spi);
         // } else {
         //     pio_spi_stop(spi);
         //     pio_spi_free(spi);
         // }
         gpio_put(LED_PIN, state);
+        spi_controller_write(controller, cbuffer, 8);
+        // memset(cbuffer, 0xFF, sizeof(cbuffer));
+        // cbuffer[0] = 2;
+        // int num_attempts = spi_controller_register_transaction(controller, cbuffer, 8, 4);
+        // SEGGER_RTT_printf(0, "Attempts: %d\n", num_attempts);
 
         sleep_ms(500);
     }

@@ -4,6 +4,9 @@
 #include "hardware/dma.h"
 #include <stdint.h>
 
+// Only supports sendings speeds up to ~7 MHz. Receives have been tested to about 15 MHz,
+// and theoretically would support about 17 MHz.
+
 // For all callbacks, it is recommended they all be marked __time_critical_func,
 // as well as any functions they call. Callbacks are not called if they are null.
 
